@@ -1,0 +1,405 @@
+{
+  "schema": 1,
+  "scope": "HEVC video sink replay, not full VNC",
+  "device": "samsung SM-S948U1",
+  "android": "17",
+  "api": 37,
+  "webview": "156.0.8078.47",
+  "width": 1920,
+  "height": 1080,
+  "chroma": "4:4:4",
+  "fixturePictures": 90,
+  "seconds": 15,
+  "warmupSeconds": 2,
+  "webCheckpointBatchPictures": 4,
+  "webMaximumOutstandingPictures": 16,
+  "preferredDisplayRefreshHz": 120,
+  "textureUpdateScope": "Callbacks after scheduled warmup boundary through final latch; not exact dropped-frame counts",
+  "build": "Debug APK; production native decoder built with -O3",
+  "fixtureSha256": "0833e2bc2208a9e9d7a2744c21a6aea269191b74a2e381fd2be0b5d079022b67",
+  "testDate": "2026-11-11",
+  "rawReportSha256": "1114cd70b352ab252d41bb4e425ffd760c463cc401eef3d1c91089c5b88c2b69",
+  "rawReportLocalPath": ".dev/benchmark/comparison-final.json",
+  "checks": {
+    "allDecodedAndPosted": true,
+    "finalPixelsMatchBetweenRoutesAndRepeats": true,
+    "measuredPicturesAcrossTrials": 16200
+  },
+  "trials": [
+    {
+      "decodedPictures": 900,
+      "surfacePosts": 900,
+      "route": "native-direct",
+      "targetFps": 60,
+      "measurementSeconds": 14.995808146,
+      "finalPixelSha256": "dca3babd0ddda4c8b66d4250b4523a224a759c332d9cabf07a2115017c04e8b4",
+      "appProcessCpuMsIncludingWarmup": 14121,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 1,
+      "postLatenessMs": {
+        "median": 12.7247,
+        "p95": 20.1472,
+        "maximum": 22.1891
+      },
+      "surface": {
+        "textureUpdates": 899,
+        "textureUpdateFps": 59.966184735875544,
+        "observationTailMs": 388.507291,
+        "intervalMs": {
+          "median": 16.8200785,
+          "p95": 25.071927,
+          "maximum": 33.43901
+        }
+      }
+    },
+    {
+      "decodedPictures": 900,
+      "surfacePosts": 900,
+      "route": "web-bridge",
+      "targetFps": 60,
+      "measurementSeconds": 15.007030646,
+      "finalPixelSha256": "dca3babd0ddda4c8b66d4250b4523a224a759c332d9cabf07a2115017c04e8b4",
+      "appProcessCpuMsIncludingWarmup": 14896,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 1,
+      "postLatenessMs": {
+        "median": 17.986426,
+        "p95": 25.905309,
+        "maximum": 28.436079
+      },
+      "surface": {
+        "textureUpdates": 892,
+        "textureUpdateFps": 59.402917982216735,
+        "observationTailMs": 343.606666,
+        "intervalMs": {
+          "median": 16.787552,
+          "p95": 25.292344,
+          "maximum": 41.487395
+        }
+      }
+    },
+    {
+      "decodedPictures": 900,
+      "surfacePosts": 900,
+      "route": "web-bridge",
+      "targetFps": 60,
+      "measurementSeconds": 15.000685073,
+      "finalPixelSha256": "dca3babd0ddda4c8b66d4250b4523a224a759c332d9cabf07a2115017c04e8b4",
+      "appProcessCpuMsIncludingWarmup": 15264,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 2,
+      "postLatenessMs": {
+        "median": 18.765268,
+        "p95": 26.12529,
+        "maximum": 28.675067
+      },
+      "surface": {
+        "textureUpdates": 878,
+        "textureUpdateFps": 58.500167989069055,
+        "observationTailMs": 343.247084,
+        "intervalMs": {
+          "median": 16.694636,
+          "p95": 25.436198,
+          "maximum": 42.235469
+        }
+      }
+    },
+    {
+      "decodedPictures": 900,
+      "surfacePosts": 900,
+      "route": "native-direct",
+      "targetFps": 60,
+      "measurementSeconds": 14.992652053,
+      "finalPixelSha256": "dca3babd0ddda4c8b66d4250b4523a224a759c332d9cabf07a2115017c04e8b4",
+      "appProcessCpuMsIncludingWarmup": 14555,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 2,
+      "postLatenessMs": {
+        "median": 13.0111,
+        "p95": 18.94,
+        "maximum": 22.4556
+      },
+      "surface": {
+        "textureUpdates": 900,
+        "textureUpdateFps": 59.96579942079546,
+        "observationTailMs": 345.259687,
+        "intervalMs": {
+          "median": 16.818646,
+          "p95": 25.100573,
+          "maximum": 33.671667
+        }
+      }
+    },
+    {
+      "decodedPictures": 900,
+      "surfacePosts": 900,
+      "route": "native-direct",
+      "targetFps": 60,
+      "measurementSeconds": 15.001779708,
+      "finalPixelSha256": "dca3babd0ddda4c8b66d4250b4523a224a759c332d9cabf07a2115017c04e8b4",
+      "appProcessCpuMsIncludingWarmup": 14532,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 3,
+      "postLatenessMs": {
+        "median": 12.9946,
+        "p95": 19.873,
+        "maximum": 22.1759
+      },
+      "surface": {
+        "textureUpdates": 883,
+        "textureUpdateFps": 58.89757489770913,
+        "observationTailMs": 342.715469,
+        "intervalMs": {
+          "median": 16.766693,
+          "p95": 25.25901,
+          "maximum": 33.67276
+        }
+      }
+    },
+    {
+      "decodedPictures": 900,
+      "surfacePosts": 900,
+      "route": "web-bridge",
+      "targetFps": 60,
+      "measurementSeconds": 15.001091115,
+      "finalPixelSha256": "dca3babd0ddda4c8b66d4250b4523a224a759c332d9cabf07a2115017c04e8b4",
+      "appProcessCpuMsIncludingWarmup": 15473,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 3,
+      "postLatenessMs": {
+        "median": 17.7673,
+        "p95": 25.895153,
+        "maximum": 32.414189
+      },
+      "surface": {
+        "textureUpdates": 897,
+        "textureUpdateFps": 59.764466496629886,
+        "observationTailMs": 344.187552,
+        "intervalMs": {
+          "median": 16.756693,
+          "p95": 32.872864,
+          "maximum": 41.312032
+        }
+      }
+    },
+    {
+      "decodedPictures": 1800,
+      "surfacePosts": 1800,
+      "route": "native-direct",
+      "targetFps": 120,
+      "measurementSeconds": 15.169493146,
+      "finalPixelSha256": "82dffadf14a65b40da2197fb4f2ef663c1ecd506fedb210e921ed2f429cb2153",
+      "appProcessCpuMsIncludingWarmup": 19585,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 1,
+      "postLatenessMs": {
+        "median": 94.4736,
+        "p95": 168.899,
+        "maximum": 177.827
+      },
+      "surface": {
+        "textureUpdates": 1783,
+        "textureUpdateFps": 117.43022700656755,
+        "observationTailMs": 344.546198,
+        "intervalMs": {
+          "median": 8.3323955,
+          "p95": 8.604427,
+          "maximum": 17.070208
+        }
+      }
+    },
+    {
+      "decodedPictures": 1800,
+      "surfacePosts": 1800,
+      "route": "web-bridge",
+      "targetFps": 120,
+      "measurementSeconds": 15.320647208,
+      "finalPixelSha256": "82dffadf14a65b40da2197fb4f2ef663c1ecd506fedb210e921ed2f429cb2153",
+      "appProcessCpuMsIncludingWarmup": 21116,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 1,
+      "postLatenessMs": {
+        "median": 215.3851935,
+        "p95": 321.058353,
+        "maximum": 328.981141
+      },
+      "surface": {
+        "textureUpdates": 1764,
+        "textureUpdateFps": 115.10332630618908,
+        "observationTailMs": 346.769114,
+        "intervalMs": {
+          "median": 8.34125,
+          "p95": 9.288021,
+          "maximum": 17.348385
+        }
+      }
+    },
+    {
+      "decodedPictures": 1800,
+      "surfacePosts": 1800,
+      "route": "web-bridge",
+      "targetFps": 120,
+      "measurementSeconds": 15.227176791,
+      "finalPixelSha256": "82dffadf14a65b40da2197fb4f2ef663c1ecd506fedb210e921ed2f429cb2153",
+      "appProcessCpuMsIncludingWarmup": 21099,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 2,
+      "postLatenessMs": {
+        "median": 149.076365,
+        "p95": 229.089559,
+        "maximum": 235.69239
+      },
+      "surface": {
+        "textureUpdates": 1776,
+        "textureUpdateFps": 116.58310203156127,
+        "observationTailMs": 348.014688,
+        "intervalMs": {
+          "median": 8.340677,
+          "p95": 8.896094,
+          "maximum": 17.014427
+        }
+      }
+    },
+    {
+      "decodedPictures": 1800,
+      "surfacePosts": 1800,
+      "route": "native-direct",
+      "targetFps": 120,
+      "measurementSeconds": 15.153034448,
+      "finalPixelSha256": "82dffadf14a65b40da2197fb4f2ef663c1ecd506fedb210e921ed2f429cb2153",
+      "appProcessCpuMsIncludingWarmup": 19571,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 0,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 2,
+      "postLatenessMs": {
+        "median": 103.3275,
+        "p95": 155.161,
+        "maximum": 161.65
+      },
+      "surface": {
+        "textureUpdates": 1780,
+        "textureUpdateFps": 117.42334958715215,
+        "observationTailMs": 341.723333,
+        "intervalMs": {
+          "median": 8.332135,
+          "p95": 8.622032,
+          "maximum": 16.931719
+        }
+      }
+    },
+    {
+      "decodedPictures": 1800,
+      "surfacePosts": 1800,
+      "route": "native-direct",
+      "targetFps": 120,
+      "measurementSeconds": 16.054602052,
+      "finalPixelSha256": "82dffadf14a65b40da2197fb4f2ef663c1ecd506fedb210e921ed2f429cb2153",
+      "appProcessCpuMsIncludingWarmup": 20486,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 0,
+      "thermalAfter": 1,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 3,
+      "postLatenessMs": {
+        "median": 103.066,
+        "p95": 946.551,
+        "maximum": 1062.94
+      },
+      "surface": {
+        "textureUpdates": 1769,
+        "textureUpdateFps": 110.15553986777567,
+        "observationTailMs": 349.914948,
+        "intervalMs": {
+          "median": 8.339713,
+          "p95": 16.67651,
+          "maximum": 17.040364
+        }
+      }
+    },
+    {
+      "decodedPictures": 1800,
+      "surfacePosts": 1800,
+      "route": "web-bridge",
+      "targetFps": 120,
+      "measurementSeconds": 17.865027103,
+      "finalPixelSha256": "82dffadf14a65b40da2197fb4f2ef663c1ecd506fedb210e921ed2f429cb2153",
+      "appProcessCpuMsIncludingWarmup": 23925,
+      "cpuScope": "App process only; excludes WebView renderer process",
+      "thermalBefore": 1,
+      "thermalAfter": 1,
+      "displayRefreshHzAtEnd": 120.0000228881836,
+      "repeat": 3,
+      "postLatenessMs": {
+        "median": 1632.7739434999999,
+        "p95": 2755.844341,
+        "maximum": 2873.361036
+      },
+      "surface": {
+        "textureUpdates": 1839,
+        "textureUpdateFps": 102.87255258791185,
+        "observationTailMs": 341.829844,
+        "intervalMs": {
+          "median": 8.38461,
+          "p95": 16.712187,
+          "maximum": 17.730885
+        }
+      }
+    }
+  ],
+  "medianAcrossTrials": [
+    {
+      "route": "native-direct",
+      "sourceFps": 60,
+      "textureUpdateFps": 59.96579942079546,
+      "postLatenessP95Ms": 19.873
+    },
+    {
+      "route": "web-bridge",
+      "sourceFps": 60,
+      "textureUpdateFps": 59.402917982216735,
+      "postLatenessP95Ms": 25.905309
+    },
+    {
+      "route": "native-direct",
+      "sourceFps": 120,
+      "textureUpdateFps": 117.42334958715215,
+      "postLatenessP95Ms": 168.899
+    },
+    {
+      "route": "web-bridge",
+      "sourceFps": 120,
+      "textureUpdateFps": 115.10332630618908,
+      "postLatenessP95Ms": 321.058353
+    }
+  ],
+  "interpretation": "Video sink only. Direct native replay reduced delay, with modest median texture-update FPS gains. Both routes accumulated backlog at 120 source FPS; final trials warmed to Android thermal status 1. Does not measure sockets, SRTP, depacketization, standard-mode rendering or LibVNCClient."
+}

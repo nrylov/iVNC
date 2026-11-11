@@ -23,6 +23,7 @@ android {
             keyPassword 'android'
         }
     }
+    sourceSets.debug.jniLibs.srcDirs = [layout.buildDirectory.dir('benchmark-libs')]
     sourceSets.main.jniLibs.srcDirs = [layout.buildDirectory.dir('native-libs')]
     sourceSets.main.assets.srcDirs = ['src/main/assets', layout.buildDirectory.dir('protocol-assets')]
 }

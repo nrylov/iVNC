@@ -1,3 +1,34 @@
+# Performance-first milestone — 2026-11-11
+
+Owner asked to compare native versus web performance before proceeding with the
+native client rewrite. Implemented a debug-only, reproducible video sink replay
+harness using the production NativeVideoSink/VideoController versus direct C++
+VideoDecoder calls. Same generated 1080p HEVC 4:4:4 pictures, decoder, conversion
+and Surface renderer; no Mac credentials, screen recording or session keys.
+
+Run `python3 scripts/benchmark.py`. The command builds using project-local tools,
+installs over the existing ADB Wi-Fi pairing and runs alternating native/web
+trials. See [methodology, limits and results](PERFORMANCE-TEST.md).
+
+Validation:
+- Local: actual Java fixture parser + six malformed inputs pass; three Python
+  packing tests pass; 455 existing Node protocol/adapter tests pass; JS/Python
+  syntax checks and git diff --check pass. Android debug benchmark APK builds.
+- Galaxy: smoke test plus final twelve trials pass. All 16,200 measured pictures
+  decoded/posted; final pixels identical between routes and repetitions.
+- Median texture callback rates: 60.0 native / 59.4 web at 60 source FPS;
+  117.4 / 115.1 at 120. Post lateness p95: 19.9/25.9 ms at 60, 168.9/321.1 ms
+  at 120. Both accumulated backlog at 120; final trials warmed (thermal status1).
+  These are video replay results, not complete native VNC or physical latency.
+
+The bridge adds delay but this test does not show a large median FPS improvement.
+Next concrete step: profile or replay incoming media packet processing, then add
+only the minimal native SRTP/depacketization receiver needed for an equivalent
+comparison. Standard-mode Canvas/libvncclient performance is still untested.
+Keep the native UI rewrite behind this investigation. Existing saved-profile,
+reconnect and controls work remains preserved on prototype-webview; shipping
+MainActivity still uses noVNC. No full native Apple session is implemented yet.
+
 # Native migration decision — 2026-11-11
 
 Owner selected LibVNCClient plus our own Android UI, with no AVNC app/UI code.

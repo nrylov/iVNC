@@ -98,6 +98,13 @@ final class VideoController implements TextureView.SurfaceTextureListener {
         });
     }
 
+    /** Emits a queue fence for diagnostics after all previously submitted pictures finish. */
+    void checkpoint(String id, String token) {
+        enqueue(id, () -> events.emit(id, "checkpoint", "{\"token\":" + JSONObject.quote(token) +
+            ",\"decoded\":" + decoded + ",\"presented\":" + presented +
+            ",\"endNs\":" + System.nanoTime() + "}"));
+    }
+
     void geometry(String id, String json) {
         if (!active.equals(id)) return;
         try {

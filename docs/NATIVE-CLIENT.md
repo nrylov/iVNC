@@ -33,7 +33,13 @@ secure-profile implementation and reconnect policy are preserved on the pushed
 `prototype-webview` branch at `c530e44`. Reuse suitable owned components while
 replacing the WebView protocol/UI runtime.
 
-First establish native standard-mode login, rendering and input. Then port the
+The owner's immediate priority is a performance comparison before expanding the
+native client. The debug-only [video replay benchmark](PERFORMANCE-TEST.md) compares
+the production web video sink with a direct C++ route through the same decoder.
+It deliberately excludes the native VNC protocol and Apple media receiver.
+
+After using that baseline to locate the bottleneck, establish native
+standard-mode login, rendering and input. Then port the
 Apple clipboard and encrypted control path, followed by High Performance media.
 Retain the prototype as a reference until native behavior passes the same tests.
 Validate Mac authentication and clipboard in both directions, cursor/gestures,
@@ -44,6 +50,7 @@ particular frame rate.
 
 ## Current status
 
-Dependency pinned and architecture chosen. The shipping app still uses noVNC;
+Dependency pinned, architecture chosen and isolated video comparison implemented.
+The shipping app still uses noVNC;
 no native LibVNCClient session has been built or tested yet. Existing native
 HEVC decoder results remain valid evidence for that component only.

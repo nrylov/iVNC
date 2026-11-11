@@ -22,6 +22,14 @@ SDK, JDK, NDK and caches remain in ignored `.dev/`. See
 [Android setup and validation](docs/ANDROID-PROTOTYPE.md) and
 [current handoff](docs/HANDOFF.md) for implementation status and known limitations.
 
+## Performance comparison
+
+A debug-only synthetic replay harness compares the existing web video bridge
+with the same decoder driven directly from native code. Run
+`python3 scripts/benchmark.py` on a paired Android device. See
+[methodology and limits](docs/PERFORMANCE-TEST.md); this isolates the video sink,
+not two complete VNC clients.
+
 ## Licensing
 
 Project and noVNC-ARD code retain MPL-2.0 notices. FFmpeg is built as replaceable
