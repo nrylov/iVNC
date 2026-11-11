@@ -19,7 +19,9 @@ final class SyntheticRfbServer implements AutoCloseable {
     final ServerSocket listener;
     final CountDownLatch pointer=new CountDownLatch(1);
     volatile Throwable failure;
-    volatile boolean authenticated;
+    volatile boolean authenticated, zrle;
+    volatile int frameLimit=2;
+    private final java.util.zip.Deflater compressor=new java.util.zip.Deflater();
     volatile String stage="accept";
     private volatile Socket socket;
     private final Thread thread;
@@ -66,14 +68,20 @@ final class SyntheticRfbServer implements AutoCloseable {
             int type=input.readUnsignedByte();
             if(type==0)input.readNBytes(19);
             else if(type==2){input.readUnsignedByte();int count=input.readUnsignedShort();require(count<256,"Encoding count too large");input.readNBytes(count*4);}
-            else if(type==3){input.readNBytes(9);if(sent++<2)frame(output);}
+            else if(type==3){input.readNBytes(9);if(sent++<frameLimit)frame(output);}
             else if(type==5){int buttons=input.readUnsignedByte(),x=input.readUnsignedShort(),y=input.readUnsignedShort();
                 require(buttons==0&&x==11&&y==17,"Pointer coordinates changed");pointer.countDown();}
             else throw new IllegalStateException("Unexpected client message "+type);
         }
     }
     private void frame(DataOutputStream output) throws Exception {
-        output.write(new byte[]{0,0,0,1});output.writeShort(0);output.writeShort(0);output.writeShort(32);output.writeShort(32);output.writeInt(0);
+        output.write(new byte[]{0,0,0,1});output.writeShort(0);output.writeShort(0);output.writeShort(32);output.writeShort(32);output.writeInt(zrle?16:0);
+        if(zrle){
+            compressor.setInput(new byte[]{1,(byte)241,64,32});
+            byte[] encoded=new byte[1024];int length=compressor.deflate(encoded,0,encoded.length,java.util.zip.Deflater.SYNC_FLUSH);
+            require(length>0&&compressor.needsInput(),"Synthetic ZRLE compression failed");
+            output.writeInt(length);output.write(encoded,0,length);output.flush();return;
+        }
         byte[] pixels=new byte[32*32*4];
         for(int offset=0;offset<pixels.length;offset+=4){pixels[offset]=(byte)241;pixels[offset+1]=64;pixels[offset+2]=32;}
         sendBody(output,pixels,32);
@@ -93,5 +101,5 @@ final class SyntheticRfbServer implements AutoCloseable {
     private static byte[] join(byte[] a,byte[] b) throws Exception {ByteArrayOutputStream out=new ByteArrayOutputStream();out.write(a);out.write(b);return out.toByteArray();}
     private static String zeroString(byte[] bytes,int offset){int end=offset;while(end<offset+64&&bytes[end]!=0)end++;return new String(bytes,offset,end-offset,java.nio.charset.StandardCharsets.UTF_8);}
     private static void require(boolean value,String message){if(!value)throw new IllegalStateException(message);}
-    @Override public void close() throws Exception {listener.close();if(socket!=null)socket.close();thread.join(2000);}
+    @Override public void close() throws Exception {listener.close();if(socket!=null)socket.close();thread.join(2000);compressor.end();}
 }

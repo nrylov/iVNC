@@ -9,7 +9,7 @@ import java.util.Set;
 final class DebugLog {
     private static final int MAX_ENTRIES=256;
     private static final int MAX_MESSAGE=1024;
-    private static final Set<String> KINDS=Set.of("status","error","size","frames","protocol","public-key");
+    private static final Set<String> KINDS=Set.of("status","error","size","frames","protocol","public-key","metrics");
     private final ArrayDeque<String> entries=new ArrayDeque<>();
     private final String header;
     private final long start=System.nanoTime();

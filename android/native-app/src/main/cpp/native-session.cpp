@@ -6,8 +6,10 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstdarg>
+#include <ctime>
 
 namespace {
+uint64_t clockNs(clockid_t clock){timespec value{};clock_gettime(clock,&value);return uint64_t(value.tv_sec)*1000000000ULL+value.tv_nsec;}
 thread_local NativeSession* loggingOwner=nullptr;
 void protocolLog(const char* format,...){
     // Deliberately whitelist metadata-only formats. Never forward desktop names,
@@ -74,14 +76,21 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
         }
         else {
             emit("status","Native standard VNC connected; Apple extensions pending");
+            metricsAt=clockNs(CLOCK_MONOTONIC);
             while(running){
                 {std::deque<Pointer> commands;{std::lock_guard<std::mutex> guard(inputMutex);commands.swap(input);}
                     for(const auto& p:commands)if(!SendPointerEvent(client,p.x,p.y,p.buttons)){running=false;break;}}
+                uint64_t waiting=clockNs(CLOCK_MONOTONIC);
                 int ready=client->buffered?1:WaitForMessage(client,10000);
+                socketWaitNs+=clockNs(CLOCK_MONOTONIC)-waiting;
                 if(ready<0){if(running)emit("error","Native socket wait failed; see Debug log");break;}
-                if(ready>0&&!HandleRFBServerMessage(client)){
-                    if(running)emit("error","Native VNC message handling failed; see Debug log");
-                    break;
+                if(ready>0){
+                    uint64_t wall=clockNs(CLOCK_MONOTONIC), cpu=clockNs(CLOCK_THREAD_CPUTIME_ID);
+                    bool handled=HandleRFBServerMessage(client);
+                    handleCpuNs+=clockNs(CLOCK_THREAD_CPUTIME_ID)-cpu;
+                    handleWallNs+=clockNs(CLOCK_MONOTONIC)-wall;
+                    reportTiming();
+                    if(!handled){if(running)emit("error","Native VNC message handling failed; see Debug log");break;}
                 }
             }
         }
@@ -93,6 +102,7 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
 }
 void NativeSession::present(){
     if(!window||!client->frameBuffer||!running)return;
+    uint64_t started=clockNs(CLOCK_MONOTONIC);
     ANativeWindow_setBuffersGeometry(window,client->width,client->height,WINDOW_FORMAT_RGBA_8888);
     ANativeWindow_Buffer buffer;if(ANativeWindow_lock(window,&buffer,nullptr)!=0)return;
     if(buffer.width>=client->width&&buffer.height>=client->height){
@@ -104,4 +114,18 @@ void NativeSession::present(){
         frames++;if(frames==1||frames%30==0){char stats[48];snprintf(stats,sizeof(stats),"%ld",frames);emit("frames",stats);}
     }
     ANativeWindow_unlockAndPost(window);
+    renderWallNs+=clockNs(CLOCK_MONOTONIC)-started;
+}
+void NativeSession::reportTiming(){
+    long count=frames-metricsFrames;
+    if(count<30)return;
+    uint64_t now=clockNs(CLOCK_MONOTONIC);
+    double duration=double(now-metricsAt)/1e9;
+    char line[320];
+    // CPU includes native decode/composition/render calls. Wall includes socket
+    // reads within a message; render is a subset, not an additional elapsed cost.
+    snprintf(line,sizeof(line),"frames=%ld fps=%.1f handle_cpu_ms/frame=%.2f handle_wall_ms/frame=%.2f render_ms/frame=%.2f socket_wait_ms/frame=%.2f",
+        count,count/duration,handleCpuNs/1e6/count,handleWallNs/1e6/count,renderWallNs/1e6/count,socketWaitNs/1e6/count);
+    emit("metrics",line);
+    metricsFrames=frames;metricsAt=now;handleCpuNs=handleWallNs=renderWallNs=socketWaitNs=0;
 }

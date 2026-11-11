@@ -103,6 +103,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     }
     private void event(String kind,String value){
         debugLog.add(kind,value);
+        if(kind.equals("metrics")||kind.equals("protocol"))return;
         if(kind.equals("error")){if(errorShown)return;errorShown=true;}
         else if(kind.equals("status")&&value.startsWith("Connecting"))errorShown=false;
         else if(kind.equals("status")&&errorShown)return;

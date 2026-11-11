@@ -11,6 +11,10 @@ endforeach()
 set(WITH_ZLIB ON CACHE BOOL "" FORCE)
 get_filename_component(IVNC_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../.." ABSOLUTE)
 add_subdirectory("${IVNC_ROOT}/.dev/libvncclient-source" libvnc)
+# AGP's Debug build otherwise leaves the C framebuffer decoders unoptimized;
+# cppFlags applies only to our C++ files. Keep symbols/UI debugging, optimize
+# the actual native engine so performance measurements are meaningful.
+target_compile_options(vncclient PRIVATE -O3)
 add_library(ivncrfb SHARED native-session.cpp native-jni.cpp apple-auth.cpp)
 target_include_directories(ivncrfb PRIVATE "${IVNC_ROOT}/.dev/libvncclient-source/include" "${CMAKE_CURRENT_BINARY_DIR}/libvnc/include")
 target_link_libraries(ivncrfb vncclient android log)

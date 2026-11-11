@@ -67,3 +67,18 @@ crypto rather than copying its JavaScript runtime. LibVNCClient's notice is also
 packaged in APK assets. Keep component attribution and source/build recipes with
 any eventual native release. The existing hybrid app remains under its original
 component licenses.
+
+## Performance investigation
+
+The 0.4 Standard-mode baseline posted roughly 26–29 updates/second on the owner's
+Mac. It was not an equivalent implementation of the hybrid's enhanced Apple
+Standard mode, and its C decoder files were also unoptimized in the Debug build.
+0.5 explicitly builds LibVNCClient with `-O3` while retaining debug instrumentation.
+The flag was verified in the actual C compilation command.
+
+The log now includes `[metrics]` batches of thirty Surface posts: average
+handler CPU/wall time, rendering wall time, outer socket-wait time and update
+rate. Rendering is included within handler time; these quantities must not be
+added as independent costs. Counts are Surface posts, not physical screen FPS.
+A synthetic thirty-frame test verifies reporting, not performance. Real Mac
+comparison of the optimized build is pending owner feedback.

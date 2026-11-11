@@ -14,12 +14,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /** A synthetic RFB server exercises JNI instead of mocking the native protocol implementation. */
 public final class NativeIntegrationInstrumentation extends Instrumentation {
-    private boolean wrappedKey, fragmented;
-    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);wrappedKey=!"pkcs1".equals(arguments.getString("keyFormat"));fragmented="true".equals(arguments.getString("fragmented"));start();}
+    private boolean wrappedKey, fragmented, zrle;
+    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);wrappedKey=!"pkcs1".equals(arguments.getString("keyFormat"));fragmented="true".equals(arguments.getString("fragmented"));zrle="zrle".equals(arguments.getString("pixelEncoding"));start();}
     @Override public void onStart(){
         Bundle result=new Bundle();long handle=0;Thread connection=null;
         AtomicReference<Throwable> failure=new AtomicReference<>();StringBuffer trace=new StringBuffer();CountDownLatch frame=new CountDownLatch(1);
         try(SyntheticRfbServer server=new SyntheticRfbServer(wrappedKey,false,fragmented);ImageReader images=ImageReader.newInstance(32,32,PixelFormat.RGBA_8888,3)){
+            server.zrle=zrle;
             handle=NativeRfb.create((kind,value)->{trace.append(kind).append(":").append(value).append("; ");if(kind.equals("error"))failure.compareAndSet(null,new IllegalStateException(value));if(kind.equals("frames"))frame.countDown();});
             final long session=handle;
             connection=new Thread(()->{try{NativeRfb.run(session,"127.0.0.1",server.listener.getLocalPort(),"synthetic-user","synthetic-password",images.getSurface());}
@@ -39,7 +40,7 @@ public final class NativeIntegrationInstrumentation extends Instrumentation {
             }finally{image.close();}
             require(failure.get()==null,"Native failure: "+failure.get());
             NativeRfb.stop(handle);connection.join(7000);require(!connection.isAlive(),"Native stop did not release socket worker");
-            result.putString("stream","PASS: fragmented="+fragmented+"; RSA key wrapper " + (wrappedKey?"SPKI":"PKCS1") + "; real LibVNCClient, Apple type-33 RSA/AES login, exact RGBA Surface pixels, queued pointer and cancellation. No WebView/noVNC.");
+            result.putString("stream","PASS: encoding="+(zrle?"ZRLE":"Raw")+"; fragmented="+fragmented+"; RSA key wrapper " + (wrappedKey?"SPKI":"PKCS1") + "; real LibVNCClient, Apple type-33 RSA/AES login, exact RGBA Surface pixels, queued pointer and cancellation. No WebView/noVNC.");
             finish(Activity.RESULT_OK,result);
         }catch(Throwable error){result.putString("stream","NATIVE INTEGRATION FAILED: "+error);finish(Activity.RESULT_CANCELED,result);}
         finally{if(handle!=0){NativeRfb.stop(handle);try{if(connection!=null)connection.join(7000);}catch(InterruptedException ignored){}if(connection==null||!connection.isAlive())NativeRfb.destroy(handle);}}

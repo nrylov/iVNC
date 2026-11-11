@@ -4,4 +4,5 @@
     <instrumentation android:name=".PasswordMaskInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Password masking regression" />
     <instrumentation android:name=".AuthenticationFailureInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Authentication rejection regression" />
     <instrumentation android:name=".MacKeyProbeInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Mac public-key handshake probe" />
+    <instrumentation android:name=".NativeMetricsInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Native timing report regression" />
 </manifest>

@@ -1,3 +1,31 @@
+# Optimized native Standard build and timing diagnostics — 2026-11-11
+
+Owner corrected that the previous hybrid was also good in Standard mode, so the
+performance gap cannot be attributed only to Standard vs HP. Found actual build
+issue: AGP Debug compiled LibVNCClient C decoder files without optimization;
+cppFlags -O3 affected only C++ JNI/render files. CMake now explicitly compiles
+vncclient with -O3; compile_commands verified for rfbclient.c.
+
+Native 0.5-native-optimized built/installed after owner re-enabled wireless ADB.
+Real Galaxy checks pass: ZRLE exact pixels + RSA/input/cancellation, continuously
+fragmented Raw transfer (small and >8KiB reads), thirty-frame native timing-report
+aggregation, password masking and complete Debug log popup/Copy binding/Clear.
+Added [metrics] every thirty Surface posts: fps, handler thread CPU/wall time,
+render wall time (subset of handler), and outer socket-wait time per frame.
+Metrics are protocol diagnostics, not physical display or input latency.
+
+Owner was asked to exercise same window/scrolling for ~20s and paste Debug log,
+including metrics, and report whether it feels smoother. Await that result.
+The new optimized build is NOT yet evidence of a measured speed improvement.
+Native 0.4 baseline APK retained at ignored .dev/native-baselines/native-0.4.apk.
+
+Next use timings to distinguish C decoding/render cost from update delivery;
+compare Standard with Standard. Hybrid uses enhanced Apple 3.889 setup,
+AutoFBUpdate push subscription and adaptive MVS/Thousands codecs; native uses
+basic 3.8/ZRLE request-driven updates. Port matching native Standard features
+before judging the base; Apple HP remains a later comparison too. No releases
+until owner evaluates both and selects a base. Working hybrid stays installed.
+
 # Native desktop now connects; Standard performance investigation — 2026-11-11
 
 Native 0.4-native-stream-fix is installed and owner confirmed sign-in/desktop.
