@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parent.parent
 SOURCE=ROOT/'third_party/libvncserver'
 OUTPUT=ROOT/'.dev/libvncclient-source'
 REVISION='98aaee0560baa0332339b2ef464ea96ed9b9b28c'
-PATCH='socket-idle-rsa33-v3'
+PATCH='socket-idle-rsa33-pipeline-v4'
 identity=REVISION+' '+PATCH
 if subprocess.check_output(['git','-C',str(SOURCE),'rev-parse','HEAD'],text=True).strip()!=REVISION:
     raise SystemExit('LibVNCClient revision differs from the reviewed pin')
@@ -62,6 +62,18 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     signature='rfbBool\nrfbHandleAuthResult('
     assert signature in source
     source=source.replace(signature,'extern void ivncAuthenticationResult(rfbClient*, uint32_t);\n\n'+signature,1)
+    # One incremental request is kept ahead of decoding, instead of adding the
+    # complete previous message's read/decode delay to every request cycle.
+    signature='  case rfbFramebufferUpdate:\n  {\n    rfbFramebufferUpdateRectHeader rect;'
+    assert source.count(signature)==1
+    source=source.replace(signature,signature+'\n    rfbBool requestWasPipelined = FALSE;')
+    received='    msg.fu.nRects = rfbClientSwap16IfLE(msg.fu.nRects);'
+    assert source.count(received)==1
+    source=source.replace(received,received+'\n    requestWasPipelined = ivncPipelineUpdates(client);\n    if (requestWasPipelined && !SendIncrementalFramebufferUpdateRequest(client)) return FALSE;')
+    tail='    if (!SendIncrementalFramebufferUpdateRequest(client))\n      return FALSE;'
+    assert source.count(tail)==1
+    source=source.replace(tail,'    if (!requestWasPipelined && !SendIncrementalFramebufferUpdateRequest(client))\n      return FALSE;')
+    source=source.replace('extern void ivncAuthenticationResult(rfbClient*, uint32_t);','extern int ivncPipelineUpdates(rfbClient*);\nextern void ivncAuthenticationResult(rfbClient*, uint32_t);')
     path.write_text(source)
     marker.write_text(identity)
 print('LibVNCClient '+identity+' prepared in project-local .dev')

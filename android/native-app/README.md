@@ -19,7 +19,7 @@ Build using existing project-local tools:
 
 The wrapper prepares an ignored `.dev/libvncclient-source` copy at upstream commit
 `98aaee0560baa0332339b2ef464ea96ed9b9b28c`, then applies the small exact-read patch
-in `scripts/prepare-libvncclient.py` (patch identity `socket-idle-rsa33-v3`). The checked-in submodule stays unchanged.
+in `scripts/prepare-libvncclient.py` (patch identity `socket-idle-rsa33-pipeline-v4`). The checked-in submodule stays unchanged.
 Upstream's `WaitForMessage` returns immediately for cached bytes; exact reads
 must instead wait on the socket when their cached bytes form only a partial
 message. Otherwise fragmented TCP input can spin through its retry budget and
@@ -80,5 +80,22 @@ The log now includes `[metrics]` batches of thirty Surface posts: average
 handler CPU/wall time, rendering wall time, outer socket-wait time and update
 rate. Rendering is included within handler time; these quantities must not be
 added as independent costs. Counts are Surface posts, not physical screen FPS.
-A synthetic thirty-frame test verifies reporting, not performance. Real Mac
-comparison of the optimized build is pending owner feedback.
+A synthetic thirty-frame test verifies reporting, not performance. The owner's
+0.5 log shows mostly 29–38 posts/sec, with later 50–54 posts/sec. Typical handler
+CPU is 6–10ms and outer socket wait 20–25ms per post. The earlier hybrid Standard
+still feels faster; this does not establish a fixed frame-rate limit.
+
+0.6 adds an experimental **Pipeline on/off** toggle. When enabled, exactly one
+next incremental request is sent after the current update header, allowing server
+preparation to overlap reading/decoding. Disabled retains the previous request
+ordering. The synthetic server withholds the body until that early request arrives
+and rejects duplicate requests, verifying ordering instead of making a speed claim.
+Compare the same activity for ~20 seconds in each mode; skip the first metrics
+batch after toggling. Real-Mac speed impact is awaiting owner feedback.
+
+A native high-contrast cursor is drawn above the desktop and moves immediately
+with trackpad input. Its hotspot follows aspect-fit letterboxing. Server PointerPos
+updates synchronize it while local input is idle; the artwork is a generic arrow.
+Cursor-only updates do not render/count as desktop frames. Cursor coordinates are
+not retained in the Debug log. Device tests verify actual cursor pixels, stacking,
+input passthrough and portrait/landscape geometry using synthetic data.

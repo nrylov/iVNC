@@ -16,6 +16,8 @@ struct NativeSession {
     rfbClient* client=nullptr;
     ANativeWindow* window=nullptr;
     std::atomic<bool> running{true};
+    std::atomic<bool> pipelineUpdates{true};
+    bool frameDirty=false;
     std::atomic<int> socket{-1};
     std::mutex inputMutex;
     struct Pointer {int x,y,buttons;};

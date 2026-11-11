@@ -32,8 +32,13 @@ rfbBool allocate(rfbClient* client){
     char geometry[64];snprintf(geometry,sizeof(geometry),"%d,%d",client->width,client->height);owner(client)->emit("size",geometry);
     return client->frameBuffer?TRUE:FALSE;
 }
-void finished(rfbClient* client){owner(client)->present();}
+void updated(rfbClient* client,int,int,int width,int height){if(width>0&&height>0)owner(client)->frameDirty=true;}
+void finished(rfbClient* client){auto* session=owner(client);if(session->frameDirty){session->present();session->frameDirty=false;}}
+rfbBool cursorPosition(rfbClient* client,int x,int y){
+    char position[64];snprintf(position,sizeof(position),"%d,%d",x,y);owner(client)->emit("cursor",position);return TRUE;
 }
+}
+extern "C" int ivncPipelineUpdates(rfbClient* client){return owner(client)->pipelineUpdates?1:0;}
 extern "C" void ivncAuthenticationResult(rfbClient* client, uint32_t result) {
     auto* session=owner(client);
     session->authenticationResult=static_cast<int>(result);
@@ -55,7 +60,8 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
     rfbClientSetClientData(client,nullptr,this);
     free(client->serverHost);
     client->serverHost=strdup(host);client->serverPort=port;client->connectTimeout=5;client->readTimeout=5;
-    client->MallocFrameBuffer=allocate;client->FinishedFrameBufferUpdate=finished;
+    client->MallocFrameBuffer=allocate;client->GotFrameBufferUpdate=updated;client->FinishedFrameBufferUpdate=finished;
+    client->HandleCursorPos=cursorPosition;client->appData.useRemoteCursor=TRUE;
     client->appData.encodingsString="zrle hextile copyrect raw";
     client->format.bitsPerPixel=32;client->format.depth=24;client->format.bigEndian=FALSE;client->format.trueColour=TRUE;
     client->format.redMax=client->format.greenMax=client->format.blueMax=255;
@@ -76,6 +82,7 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
         }
         else {
             emit("status","Native standard VNC connected; Apple extensions pending");
+            emit("status",pipelineUpdates?"Update requests pipelined before framebuffer decoding":"Update requests sent after framebuffer decoding");
             metricsAt=clockNs(CLOCK_MONOTONIC);
             while(running){
                 {std::deque<Pointer> commands;{std::lock_guard<std::mutex> guard(inputMutex);commands.swap(input);}
@@ -124,8 +131,8 @@ void NativeSession::reportTiming(){
     char line[320];
     // CPU includes native decode/composition/render calls. Wall includes socket
     // reads within a message; render is a subset, not an additional elapsed cost.
-    snprintf(line,sizeof(line),"frames=%ld fps=%.1f handle_cpu_ms/frame=%.2f handle_wall_ms/frame=%.2f render_ms/frame=%.2f socket_wait_ms/frame=%.2f",
-        count,count/duration,handleCpuNs/1e6/count,handleWallNs/1e6/count,renderWallNs/1e6/count,socketWaitNs/1e6/count);
+    snprintf(line,sizeof(line),"frames=%ld fps=%.1f pipeline=%s handle_cpu_ms/frame=%.2f handle_wall_ms/frame=%.2f render_ms/frame=%.2f socket_wait_ms/frame=%.2f",
+        count,count/duration,pipelineUpdates?"on":"off",handleCpuNs/1e6/count,handleWallNs/1e6/count,renderWallNs/1e6/count,socketWaitNs/1e6/count);
     emit("metrics",line);
     metricsFrames=frames;metricsAt=now;handleCpuNs=handleWallNs=renderWallNs=socketWaitNs=0;
 }

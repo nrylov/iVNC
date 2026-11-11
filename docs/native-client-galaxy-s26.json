@@ -2,7 +2,7 @@
   "date": "2026-11-11",
   "package": "dev.ivnc.nativeclient",
   "libraryCommit": "98aaee0560baa0332339b2ef464ea96ed9b9b28c",
-  "localPatch": "socket-idle-rsa33-v3",
+  "localPatch": "socket-idle-rsa33-pipeline-v4",
   "device": "Samsung SM-S948U1",
   "nativeBuild": "PASS",
   "deviceSyntheticIntegration": {
@@ -22,14 +22,20 @@
     "oldTimeoutRegressionFailedAsExpected": true,
     "debugLogUiHistoryCopyBindingClear": true,
     "optimizedZrleExactPixels": true,
-    "timingReportThirtyFrames": true
+    "timingReportThirtyFrames": true,
+    "pipelinedRequestBeforeFramebufferBody": true,
+    "noDuplicateRequestAfterPipelinedFrame": true,
+    "pipelineOffFragmentedRawFallback": true,
+    "serverPointerPositionCallback": true,
+    "cursorDrawingAndAspectFitGeometry": true,
+    "cursorAboveTextureViewAndTouchPassthrough": true
   },
   "webViewOrNoVNCRuntimeIncluded": false,
   "realMacSession": "Owner verified accepted login and live 1920x1080 native framebuffer",
   "highPerformance": "Not yet ported",
   "appleClipboard": "Not yet ported",
   "release": "On hold by owner until native is evaluated",
-  "appVersion": "0.5-native-optimized",
+  "appVersion": "0.6-native-cursor-pipeline",
   "realMacPublicKeyProbe": {
     "passed": true,
     "credentialsSent": false,
@@ -37,7 +43,18 @@
     "publicKeyParsedByAndroidCrypto": true
   },
   "observedNativeSurfacePostsPerSecond": 26.4,
-  "performanceComparison": "Owner reports earlier hybrid Standard mode was faster; native lacks enhanced Apple setup/codecs, and library C decoder optimization needs correction.",
+  "performanceComparison": "Owner reports optimized native Standard improved but remains below earlier hybrid Standard. Native still lacks enhanced Apple setup/codecs.",
   "nativeLibraryCOptimization": "-O3 verified in rfbclient.c compile command",
-  "optimizedRealMacPerformance": "Awaiting owner timing log; no speed improvement claimed yet"
+  "optimizedRealMacPerformance": {
+    "version": "0.5-native-optimized",
+    "source": "Owner pasted safe timing log",
+    "typicalSurfacePostsPerSecond": "29–38",
+    "laterSurfacePostsPerSecond": "50–54",
+    "typicalHandlerCpuMsPerPost": "6–10",
+    "typicalRenderWallMsPerPost": "3–5 (subset of handler wall)",
+    "typicalOuterSocketWaitMsPerPost": "20–25",
+    "interpretation": "Substantial update-delivery waiting; not a fixed 30fps cap. Does not isolate server encoding versus network/request timing."
+  },
+  "nativeCursor": "Generic local arrow; immediate local motion and server PointerPos sync. Not server cursor artwork.",
+  "requestPipelineRealMacComparison": "Installed; awaiting owner on/off comparison. No speed improvement claimed yet."
 }

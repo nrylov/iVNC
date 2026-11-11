@@ -16,3 +16,7 @@ extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_pointer(J
     if(!handle)return;auto* session=reinterpret_cast<NativeSession*>(handle);std::lock_guard<std::mutex> guard(session->inputMutex);
     if(session->input.size()<256)session->input.push_back({x,y,buttons});
 }
+
+extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_pipeline(JNIEnv*,jclass,jlong handle,jboolean enabled){
+    if(handle)reinterpret_cast<NativeSession*>(handle)->pipelineUpdates=(enabled==JNI_TRUE);
+}

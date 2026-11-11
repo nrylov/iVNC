@@ -24,6 +24,11 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private final Object lifetime=new Object();
     private long handle;
     private TextureView texture;
+    private CursorOverlay cursor;
+    private android.widget.ToggleButton pipeline;
+    private boolean connected,touchActive;
+    private long lastLocalPointerAt;
+    private static final long CURSOR_ECHO_GRACE_MS=150;
     private Surface surface;
     private TextView status;
     private DebugLog debugLog;
@@ -43,12 +48,20 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         root.setBackgroundColor(0xff080d14);
         texture=new TextureView(this);texture.setSurfaceTextureListener(this);
         root.addView(texture,new FrameLayout.LayoutParams(-1,-1));
+        cursor=new CursorOverlay(this);cursor.setVisibility(View.INVISIBLE);root.addView(cursor,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout bar=new LinearLayout(this);bar.setOrientation(LinearLayout.VERTICAL);bar.setBackgroundColor(0xd0101b2a);
         status=new TextView(this);status.setTag("native-status");status.setText("Native LibVNCClient experiment — Standard mode");bar.addView(status);
         Button connection=new Button(this);connection.setText("Connection");connection.setOnClickListener(v->connectionDialog());
         Button log=new Button(this);log.setText("Debug log");log.setTag("native-debug-log");log.setOnClickListener(v->showDebugLog());
         LinearLayout actions=new LinearLayout(this);actions.addView(connection,new LinearLayout.LayoutParams(0,-2,1));
-        actions.addView(log,new LinearLayout.LayoutParams(0,-2,1));bar.addView(actions);
+        actions.addView(log,new LinearLayout.LayoutParams(0,-2,1));
+        pipeline=new android.widget.ToggleButton(this);pipeline.setTextOn("Pipeline on");pipeline.setTextOff("Pipeline off");pipeline.setChecked(true);pipeline.setTextSize(12);
+        pipeline.setTag("native-pipeline");pipeline.setContentDescription("Pipeline framebuffer update requests");
+        pipeline.setOnCheckedChangeListener((button,enabled)->{
+            synchronized(lifetime){if(handle!=0)NativeRfb.pipeline(handle,enabled);}
+            debugLog.add("status","Update request pipeline "+(enabled?"enabled":"disabled")+" for subsequent updates");
+        });
+        actions.addView(pipeline,new LinearLayout.LayoutParams(0,-2,1));bar.addView(actions);
         root.addView(bar,new FrameLayout.LayoutParams(-1,-2));
         texture.setOnTouchListener(this::touch);
         setContentView(root);
@@ -94,15 +107,25 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         if(address.isEmpty()||username.isEmpty()||secret.isEmpty()){status.setText("Enter the Mac address and login");return;}
         password.setText("");stop();
         final Surface target=surface;
+        final boolean earlyRequests=pipeline.isChecked();
         worker.execute(()->{
             final long session;
-            synchronized(lifetime){session=NativeRfb.create((kind,value)->runOnUiThread(()->event(kind,value)));handle=session;}
+            synchronized(lifetime){session=NativeRfb.create((kind,value)->runOnUiThread(()->event(kind,value)));handle=session;NativeRfb.pipeline(session,earlyRequests);}
             try{NativeRfb.run(session,address,selectedPort,username,secret,target);}
             finally{synchronized(lifetime){if(handle==session)handle=0;NativeRfb.destroy(session);}}
         });
     }
     private void event(String kind,String value){
+        if(kind.equals("cursor")){
+            if(!touchActive&&android.os.SystemClock.uptimeMillis()-lastLocalPointerAt>=CURSOR_ECHO_GRACE_MS){
+                String[] position=value.split(",");cursorX=Math.max(0,Math.min(width-1,Float.parseFloat(position[0])));
+                cursorY=Math.max(0,Math.min(height-1,Float.parseFloat(position[1])));updateCursor();
+            }
+            return;
+        }
         debugLog.add(kind,value);
+        if(kind.equals("status")&&value.startsWith("Native standard VNC connected"))connected=true;
+        if(kind.equals("error")||(kind.equals("status")&&value.equals("Native connection ended"))){connected=false;cursor.setVisibility(View.INVISIBLE);}
         if(kind.equals("metrics")||kind.equals("protocol"))return;
         if(kind.equals("error")){if(errorShown)return;errorShown=true;}
         else if(kind.equals("status")&&value.startsWith("Connecting"))errorShown=false;
@@ -110,30 +133,33 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         if(kind.equals("size")){
             String[] size=value.split(",");width=Integer.parseInt(size[0]);height=Integer.parseInt(size[1]);
             cursorX=width/2f;cursorY=height/2f;fit();
-        }else if(kind.equals("frames"))status.setText("Native Standard · "+value+" Surface posts");
+        }else if(kind.equals("frames")){if(connected)cursor.setVisibility(View.VISIBLE);status.setText("Native Standard · "+value+" Surface posts");}
         else status.setText(value);
     }
     private void fit(){
         if(width<1||height<1||texture.getWidth()<1||texture.getHeight()<1)return;
-        float scale=Math.min(texture.getWidth()/(float)width,texture.getHeight()/(float)height);
+        float scale=ViewportMath.scale(texture.getWidth(),texture.getHeight(),width,height);
         android.graphics.Matrix transform=new android.graphics.Matrix();
         transform.setScale(width*scale/texture.getWidth(),height*scale/texture.getHeight(),texture.getWidth()/2f,texture.getHeight()/2f);
-        texture.setTransform(transform);
+        texture.setTransform(transform);updateCursor();
     }
+    private void updateCursor(){cursor.position(width,height,cursorX,cursorY);}
     private boolean touch(View view,MotionEvent event){
         if(event.getPointerCount()!=1)return true;
         float x=event.getX(),y=event.getY();
-        if(event.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=downX=x;lastY=downY=y;downAt=event.getEventTime();moved=false;return true;}
+        if(event.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=downX=x;lastY=downY=y;downAt=event.getEventTime();moved=false;touchActive=true;return true;}
         if(event.getActionMasked()==MotionEvent.ACTION_MOVE){
-            float scale=Math.min(texture.getWidth()/(float)width,texture.getHeight()/(float)height);
+            float scale=ViewportMath.scale(texture.getWidth(),texture.getHeight(),width,height);
             cursorX=Math.max(0,Math.min(width-1,cursorX+(x-lastX)/Math.max(.01f,scale)));
             cursorY=Math.max(0,Math.min(height-1,cursorY+(y-lastY)/Math.max(.01f,scale)));
             moved|=Math.hypot(x-downX,y-downY)>12;lastX=x;lastY=y;pointer(0);
-        }else if(event.getActionMasked()==MotionEvent.ACTION_UP&&!moved&&event.getEventTime()-downAt<350){pointer(1);pointer(0);}
+        }else if(event.getActionMasked()==MotionEvent.ACTION_UP){
+            touchActive=false;if(!moved&&event.getEventTime()-downAt<350){pointer(1);pointer(0);}
+        }else if(event.getActionMasked()==MotionEvent.ACTION_CANCEL)touchActive=false;
         return true;
     }
-    private void pointer(int buttons){synchronized(lifetime){if(handle!=0)NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons);}}
-    private void stop(){synchronized(lifetime){if(handle!=0)NativeRfb.stop(handle);}}
+    private void pointer(int buttons){lastLocalPointerAt=android.os.SystemClock.uptimeMillis();updateCursor();synchronized(lifetime){if(handle!=0)NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons);}}
+    private void stop(){connected=false;touchActive=false;if(cursor!=null)cursor.setVisibility(View.INVISIBLE);synchronized(lifetime){if(handle!=0)NativeRfb.stop(handle);}}
     @Override public void onSurfaceTextureAvailable(SurfaceTexture value,int width,int height){surface=new Surface(value);fit();}
     @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture value){stop();if(surface!=null)surface.release();surface=null;return true;}
     @Override public void onSurfaceTextureSizeChanged(SurfaceTexture value,int width,int height){fit();}

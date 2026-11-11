@@ -1,3 +1,45 @@
+# Native cursor and bounded update pipelining — 2026-11-11
+
+Owner tested optimized native 0.5: improved but below earlier hybrid Standard,
+with missing cursor. Their log has mostly 29–38 Surface posts/sec, handler CPU
+6–10ms, render 3–5ms and outer socket wait 20–25ms per post. Later activity
+reaches 50–54/sec with lower CPU. This is not a fixed 30fps cap. Delivery wait is
+substantial but does not distinguish server encoding, network and request timing.
+
+Built/installed 0.6-native-cursor-pipeline. Added native white arrow/black outline
+above TextureView, immediate local motion, aspect-fit hotspot mapping and remote
+PointerPos synchronization (ignore stale echoes during local touch / 150ms after).
+Requests remote cursor updates; uses generic arrow, not remote cursor artwork.
+Only framebuffer pixel updates trigger rendering; cursor-only updates no longer
+count as desktop Surface posts. Coordinates never enter the Debug log.
+
+Experimental pipeline sends exactly one next incremental request after receiving
+the current update header, before reading/decoding its rectangle bodies. Captures
+the mode per update to suppress the old end-of-update request without duplicating
+or dropping requests when toggled. HUD Pipeline on/off defaults on and JNI flag
+is atomic. Timing log includes pipeline state; skip the first batch following a
+toggle when comparing. This is not Apple AutoFBUpdate / enhanced session support.
+Patch identity socket-idle-rsa33-pipeline-v4; submodule remains unchanged.
+
+Validation on paired Galaxy (synthetic data only):
+- ZRLE exact RGBA + RSA/AES + pointer + stop, requiring the next request BEFORE
+  releasing the framebuffer body: PASS, no duplicate request afterward.
+- Pipeline off + continuously fragmented Raw/key reads + cursor callback: PASS.
+- Actual Android cursor drawing: arrow/outline pixels, portrait/landscape mapping,
+  stacking above TextureView, touch passthrough and connection visibility: PASS.
+- Thirty-frame timing aggregation, password mask/state protection and Debug log
+  UI history/Copy binding/Clear: PASS. Host DebugLog test: PASS. APK build: PASS.
+No Mac GUI/browser verification performed; owner comparison requested next.
+
+Owner was asked to reconnect, test cursor and compare the same window/scrolling
+for ~20s each Pipeline on/off, then send Debug log and subjective result. Await
+that comparison; no real-Mac speed improvement claimed for pipelining yet.
+Next: use result to choose request mode, then port enhanced Apple Standard setup /
+codecs (hybrid uses 3.889, AutoFBUpdate and MVS/Thousands), followed by Apple HP.
+Native still lacks clipboard/keyboard, profiles/reconnect and full gesture UI.
+Working hybrid remains installed. Release remains explicitly ON HOLD until owner
+chooses a base. Sources may be pushed; no release/tag/APK publication yet.
+
 # Optimized native Standard build and timing diagnostics — 2026-11-11
 
 Owner corrected that the previous hybrid was also good in Standard mode, so the

@@ -14,19 +14,22 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /** A synthetic RFB server exercises JNI instead of mocking the native protocol implementation. */
 public final class NativeIntegrationInstrumentation extends Instrumentation {
-    private boolean wrappedKey, fragmented, zrle;
-    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);wrappedKey=!"pkcs1".equals(arguments.getString("keyFormat"));fragmented="true".equals(arguments.getString("fragmented"));zrle="zrle".equals(arguments.getString("pixelEncoding"));start();}
+    private boolean wrappedKey, fragmented, zrle, ahead, pipeline=true;
+    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);wrappedKey=!"pkcs1".equals(arguments.getString("keyFormat"));fragmented="true".equals(arguments.getString("fragmented"));zrle="zrle".equals(arguments.getString("pixelEncoding"));ahead="true".equals(arguments.getString("requireAhead"));pipeline=!"false".equals(arguments.getString("pipeline"));start();}
     @Override public void onStart(){
         Bundle result=new Bundle();long handle=0;Thread connection=null;
         AtomicReference<Throwable> failure=new AtomicReference<>();StringBuffer trace=new StringBuffer();CountDownLatch frame=new CountDownLatch(1);
         try(SyntheticRfbServer server=new SyntheticRfbServer(wrappedKey,false,fragmented);ImageReader images=ImageReader.newInstance(32,32,PixelFormat.RGBA_8888,3)){
-            server.zrle=zrle;
+            server.zrle=zrle;server.requireAhead=ahead;server.cursorPosition=true;
             handle=NativeRfb.create((kind,value)->{trace.append(kind).append(":").append(value).append("; ");if(kind.equals("error"))failure.compareAndSet(null,new IllegalStateException(value));if(kind.equals("frames"))frame.countDown();});
+            NativeRfb.pipeline(handle,pipeline);
             final long session=handle;
             connection=new Thread(()->{try{NativeRfb.run(session,"127.0.0.1",server.listener.getLocalPort(),"synthetic-user","synthetic-password",images.getSurface());}
                 catch(Throwable error){failure.set(error);}},"native-test-client");connection.start();
             require(frame.await(15,TimeUnit.SECONDS),"No rendered frame; "+failure.get()+"; server "+server.failure+"; stage "+server.stage+"; authenticated "+server.authenticated+"; trace "+trace);
             require(server.authenticated,"RSA/AES login did not verify");
+            require(!ahead||server.aheadReceived,"Next request was not sent before the framebuffer body");
+            require(trace.toString().contains("cursor:11,17"),"Server cursor position callback missing");
             NativeRfb.pointer(handle,11,17,0);require(server.pointer.await(5,TimeUnit.SECONDS),"Native pointer message missing");
             Image image=null;
             for(int attempt=0;attempt<100&&image==null;attempt++){image=images.acquireLatestImage();if(image==null)Thread.sleep(5);}
@@ -40,7 +43,7 @@ public final class NativeIntegrationInstrumentation extends Instrumentation {
             }finally{image.close();}
             require(failure.get()==null,"Native failure: "+failure.get());
             NativeRfb.stop(handle);connection.join(7000);require(!connection.isAlive(),"Native stop did not release socket worker");
-            result.putString("stream","PASS: encoding="+(zrle?"ZRLE":"Raw")+"; fragmented="+fragmented+"; RSA key wrapper " + (wrappedKey?"SPKI":"PKCS1") + "; real LibVNCClient, Apple type-33 RSA/AES login, exact RGBA Surface pixels, queued pointer and cancellation. No WebView/noVNC.");
+            result.putString("stream","PASS: encoding="+(zrle?"ZRLE":"Raw")+"; pipeline="+pipeline+"; ahead verified="+ahead+"; cursor position verified; fragmented="+fragmented+"; RSA key wrapper " + (wrappedKey?"SPKI":"PKCS1") + "; real LibVNCClient, Apple type-33 RSA/AES login, exact RGBA Surface pixels, queued pointer and cancellation. No WebView/noVNC.");
             finish(Activity.RESULT_OK,result);
         }catch(Throwable error){result.putString("stream","NATIVE INTEGRATION FAILED: "+error);finish(Activity.RESULT_CANCELED,result);}
         finally{if(handle!=0){NativeRfb.stop(handle);try{if(connection!=null)connection.join(7000);}catch(InterruptedException ignored){}if(connection==null||!connection.isAlive())NativeRfb.destroy(handle);}}
