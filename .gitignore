@@ -32,3 +32,6 @@ android/.gradle/
 android/.kotlin/
 android/**/build/
 android/local.properties
+
+# Android native-client generated CMake state
+android/**/.cxx/

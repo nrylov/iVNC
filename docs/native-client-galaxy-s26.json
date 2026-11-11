@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-11",
+  "package": "dev.ivnc.nativeclient",
+  "libraryCommit": "98aaee0560baa0332339b2ef464ea96ed9b9b28c",
+  "localPatch": "socket-wait-v1",
+  "device": "Samsung SM-S948U1",
+  "nativeBuild": "PASS",
+  "deviceSyntheticIntegration": {
+    "realLibVNCClient": true,
+    "appleType33RsaAesVerified": true,
+    "fragmentedTcpHandled": true,
+    "exactRgbaSurfacePixels": true,
+    "queuedPointerCoordinatesVerified": true,
+    "socketWorkerCancellation": true
+  },
+  "webViewOrNoVNCRuntimeIncluded": false,
+  "realMacSession": "Awaiting owner login/test",
+  "highPerformance": "Not yet ported",
+  "appleClipboard": "Not yet ported",
+  "release": "On hold by owner until native is evaluated"
+}

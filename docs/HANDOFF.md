@@ -1,3 +1,33 @@
+# Native LibVNCClient core built and tested — 2026-11-11
+
+Created separate module android/native-app, package dev.ivnc.nativeclient, label
+iVNC Native. Installs alongside working hybrid client; no WebView/noVNC/AVNC code
+in its runtime. Own Java Views connection form/relative input, C++ LibVNCClient
+sockets/framebuffer renderer and JNI, Android JCA Apple RSATunnel auth type33.
+Uses stock RFB 3.8 compatibility initially; Apple session-select/HP/clipboard/
+key encryption and saved profiles/reconnect are NOT ported to native yet.
+
+Native APK builds with project-local NDK/CMake and passes real Galaxy loopback
+integration: RSA/AES synthetic login, fragmented TCP exchange, exact RGBA Surface
+pixels, queued pointer input and cancellation. Initial failure identified an
+upstream exact-read issue: WaitForMessage's cached-byte shortcut spins while a
+partial message waits for more socket bytes. Reproducible patch now applies to
+ignored .dev/libvncclient-source, leaving pinned submodule unchanged.
+Build: scripts/build-native-client.sh. Module README documents limitations,
+license and test command. Real Mac verification pending: Native app is open;
+owner was asked to enter Mac login in that app (never in chat/tools).
+
+Release remains explicitly ON HOLD until the owner tries native and chooses a
+base. Current hybrid fullscreen/trackpad fix is pushed as b9a1b8b; secure login/
+reconnect as cdc3d9a; sparse video fix as 268d494. The current hybrid APK was subsequently rebuilt/installed with the permanent
+subtree touch-action fix (after CSSOM verification and owner confirmation).
+472 existing/gesture/keyboard tests still pass. The native test app remains a
+separate package and was not overwritten by that update.
+
+Next: inspect owner's real Mac native result, implement any required Apple
+session setup, then benchmark like-for-like before choosing/porting HP. Keep
+working hybrid client's encrypted store intact. No release has been published.
+
 # Fullscreen viewer and native experiment — 2026-11-11
 
 Owner verified encrypted save + foreground reconnect work. Requested fullscreen

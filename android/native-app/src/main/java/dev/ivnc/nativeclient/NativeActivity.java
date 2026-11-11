@@ -1,0 +1,114 @@
+/* Independent Android viewer for testing LibVNCClient against the Mac without WebView. */
+package dev.ivnc.nativeclient;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.os.Bundle;
+import android.graphics.SurfaceTexture;
+import android.text.InputType;
+import android.view.MotionEvent;
+import android.view.Surface;
+import android.view.TextureView;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/** Experimental Standard-mode path; kept separate from the working HP client. */
+public final class NativeActivity extends Activity implements TextureView.SurfaceTextureListener {
+    private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private final Object lifetime=new Object();
+    private long handle;
+    private TextureView texture;
+    private Surface surface;
+    private TextView status;
+    private int width=1920,height=1080;
+    private float cursorX=960,cursorY=540,lastX,lastY,downX,downY;
+    private long downAt;
+    private boolean moved, errorShown;
+    private EditText host,port,user,password;
+    @Override public void onCreate(Bundle state){
+        super.onCreate(state);
+        FrameLayout root=new FrameLayout(this);
+        root.setBackgroundColor(0xff080d14);
+        texture=new TextureView(this);texture.setSurfaceTextureListener(this);
+        root.addView(texture,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout bar=new LinearLayout(this);bar.setOrientation(LinearLayout.VERTICAL);bar.setBackgroundColor(0xd0101b2a);
+        status=new TextView(this);status.setText("Native LibVNCClient experiment — Standard mode");bar.addView(status);
+        Button connection=new Button(this);connection.setText("Connection");connection.setOnClickListener(v->connectionDialog());bar.addView(connection);
+        root.addView(bar,new FrameLayout.LayoutParams(-1,-2));
+        texture.setOnTouchListener(this::touch);
+        setContentView(root);
+        host=field("Mac address",InputType.TYPE_CLASS_TEXT);port=field("Port",InputType.TYPE_CLASS_NUMBER);port.setText("5900");
+        user=field("Mac username",InputType.TYPE_CLASS_TEXT);password=field("Mac password",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        connectionDialog();
+    }
+    private EditText field(String hint,int type){EditText input=new EditText(this);input.setHint(hint);input.setInputType(type);input.setSingleLine();return input;}
+    private void connectionDialog(){
+        LinearLayout fields=new LinearLayout(this);fields.setPadding(24,12,24,0);fields.setOrientation(LinearLayout.VERTICAL);
+        for(EditText input:new EditText[]{host,port,user,password}){
+            if(input.getParent()!=null)((android.view.ViewGroup)input.getParent()).removeView(input);fields.addView(input);
+        }
+        new AlertDialog.Builder(this).setTitle("iVNC Native experiment").setView(fields)
+            .setMessage("Separate test app. Apple High Performance and clipboard extensions are not integrated yet.")
+            .setPositiveButton("Connect",(dialog,which)->connect()).setNeutralButton("Disconnect",(dialog,which)->stop())
+            .setNegativeButton("Cancel",null).show();
+    }
+    private void connect(){
+        if(surface==null){status.setText("Display is not ready; try Connect again");return;}
+        final int selectedPort;
+        try{selectedPort=Integer.parseInt(port.getText().toString());if(selectedPort<1||selectedPort>65535)throw new NumberFormatException();}
+        catch(NumberFormatException invalid){status.setText("Invalid port");return;}
+        final String address=host.getText().toString().trim(),username=user.getText().toString(),secret=password.getText().toString();
+        if(address.isEmpty()||username.isEmpty()||secret.isEmpty()){status.setText("Enter the Mac address and login");return;}
+        password.setText("");stop();
+        final Surface target=surface;
+        worker.execute(()->{
+            final long session;
+            synchronized(lifetime){session=NativeRfb.create((kind,value)->runOnUiThread(()->event(kind,value)));handle=session;}
+            try{NativeRfb.run(session,address,selectedPort,username,secret,target);}
+            finally{synchronized(lifetime){if(handle==session)handle=0;NativeRfb.destroy(session);}}
+        });
+    }
+    private void event(String kind,String value){
+        if(kind.equals("error"))errorShown=true;
+        else if(kind.equals("status")&&value.startsWith("Connecting"))errorShown=false;
+        else if(kind.equals("status")&&errorShown)return;
+        if(kind.equals("size")){
+            String[] size=value.split(",");width=Integer.parseInt(size[0]);height=Integer.parseInt(size[1]);
+            cursorX=width/2f;cursorY=height/2f;fit();
+        }else if(kind.equals("frames"))status.setText("Native Standard · "+value+" Surface posts");
+        else status.setText(value);
+    }
+    private void fit(){
+        if(width<1||height<1||texture.getWidth()<1||texture.getHeight()<1)return;
+        float scale=Math.min(texture.getWidth()/(float)width,texture.getHeight()/(float)height);
+        android.graphics.Matrix transform=new android.graphics.Matrix();
+        transform.setScale(width*scale/texture.getWidth(),height*scale/texture.getHeight(),texture.getWidth()/2f,texture.getHeight()/2f);
+        texture.setTransform(transform);
+    }
+    private boolean touch(View view,MotionEvent event){
+        if(event.getPointerCount()!=1)return true;
+        float x=event.getX(),y=event.getY();
+        if(event.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=downX=x;lastY=downY=y;downAt=event.getEventTime();moved=false;return true;}
+        if(event.getActionMasked()==MotionEvent.ACTION_MOVE){
+            float scale=Math.min(texture.getWidth()/(float)width,texture.getHeight()/(float)height);
+            cursorX=Math.max(0,Math.min(width-1,cursorX+(x-lastX)/Math.max(.01f,scale)));
+            cursorY=Math.max(0,Math.min(height-1,cursorY+(y-lastY)/Math.max(.01f,scale)));
+            moved|=Math.hypot(x-downX,y-downY)>12;lastX=x;lastY=y;pointer(0);
+        }else if(event.getActionMasked()==MotionEvent.ACTION_UP&&!moved&&event.getEventTime()-downAt<350){pointer(1);pointer(0);}
+        return true;
+    }
+    private void pointer(int buttons){synchronized(lifetime){if(handle!=0)NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons);}}
+    private void stop(){synchronized(lifetime){if(handle!=0)NativeRfb.stop(handle);}}
+    @Override public void onSurfaceTextureAvailable(SurfaceTexture value,int width,int height){surface=new Surface(value);fit();}
+    @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture value){stop();if(surface!=null)surface.release();surface=null;return true;}
+    @Override public void onSurfaceTextureSizeChanged(SurfaceTexture value,int width,int height){fit();}
+    @Override public void onSurfaceTextureUpdated(SurfaceTexture value){}
+    @Override protected void onPause(){stop();super.onPause();}
+    @Override protected void onDestroy(){stop();worker.shutdown();super.onDestroy();}
+}

@@ -1,0 +1,4 @@
+<!-- Synthetic protocol test is available only in the experimental debug APK. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <instrumentation android:name=".NativeIntegrationInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Native RFB integration" />
+</manifest>

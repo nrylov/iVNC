@@ -36,8 +36,16 @@ with the same decoder driven directly from native code. Run
 [methodology and limits](docs/PERFORMANCE-TEST.md); this isolates the video sink,
 not two complete VNC clients.
 
+## Native experiment
+
+`android/native-app` is a separate LibVNCClient-based Android app with its own
+native protocol/render path and Android UI. See [native experiment status](android/native-app/README.md).
+It is not yet equivalent to the working Apple High Performance client. GitHub
+APK release is on hold until the owner compares the variants and chooses a base.
+
 ## Licensing
 
-Project and noVNC-ARD code retain MPL-2.0 notices. FFmpeg is built as replaceable
+Original prototype and noVNC-ARD code retain MPL-2.0 notices. The separate
+native-app experiment is GPL-3.0-or-later with LibVNCClient GPL notices retained. FFmpeg is built as replaceable
 shared libraries under LGPL-2.1-or-later; corresponding source and build instructions
 are included with the app. Original upstream documentation is in [UPSTREAM.md](UPSTREAM.md).

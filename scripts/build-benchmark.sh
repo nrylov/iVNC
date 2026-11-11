@@ -13,4 +13,4 @@ mkdir -p "$OUT"
   "$PROJECT_ROOT/android/app/src/debug/cpp/benchmark-replay.cpp" \
   -lapplevideo -landroid -static-libstdc++ -Wl,-z,max-page-size=16384 \
   -Wl,-soname,libivncbenchmark.so -o "$OUT/libivncbenchmark.so"
-exec gradle --no-daemon -p "$PROJECT_ROOT/android" assembleDebug "$@"
+exec gradle --no-daemon -p "$PROJECT_ROOT/android" :app:assembleDebug "$@"
