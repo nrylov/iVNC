@@ -196,10 +196,10 @@ export class HpSession {
             this._maybeOffer();
         };
         ws.onmessage = ev => this._onMedia(ev.data);
-        ws.onclose = () => {
+        ws.onclose = event => {
             this._wsOpen = false;
             if (this.state !== 'closed' && this.state !== 'failed') {
-                this._fail(this.state === 'idle' && !this._message1 ? 'media-connect' : 'media-closed');
+                this._fail(this.state === 'idle' && !this._message1 ? 'media-connect' : 'media-closed', event?.reason);
             }
         };
         ws.onerror = () => {};   // a close event follows

@@ -18,6 +18,8 @@ final class VideoController implements TextureView.SurfaceTextureListener {
     interface Events { void emit(String id, String kind, String value); }
     private final Activity activity;
     private final Events events;
+    private final boolean coalesce;
+    private boolean presentationPending;
     private final FrameLayout clip;
     private final TextureView texture;
     private final PointerOverlay pointer;
@@ -36,8 +38,14 @@ final class VideoController implements TextureView.SurfaceTextureListener {
     private volatile boolean viewportVisible;
 
     VideoController(Activity activity, FrameLayout parent, Events events) {
+        this(activity, parent, events, true);
+    }
+
+    /** Eager presentation is retained for controlled replay tests, not live streaming. */
+    VideoController(Activity activity, FrameLayout parent, Events events, boolean coalesce) {
         this.activity = activity;
         this.events = events;
+        this.coalesce = coalesce;
         clip = new FrameLayout(activity);
         clip.setClipChildren(true);
         clip.setClickable(false);
@@ -82,20 +90,41 @@ final class VideoController implements TextureView.SurfaceTextureListener {
         enqueue(null, () -> {
             try {
                 if (!active.equals(id) || handle == 0) return;
-                int result = NativeVideo.decode(handle, bytes, timestamp, stripe);
+                int result = coalesce ? NativeVideo.decodeOnly(handle, bytes, timestamp, stripe)
+                    : NativeVideo.decode(handle, bytes, timestamp, stripe);
                 if (result < 0) { android.util.Log.w("AppleVideo", "Native decode/presentation code " + result); events.emit(id, "error", "Native decode/presentation failed (" + result + ")"); return; }
                 decoded += result & 0xffff;
-                if ((result & 0x10000) != 0) {
-                    presented++;
-                    if (presented == 1) activity.runOnUiThread(() -> { if (active.equals(id) && viewportVisible) clip.setAlpha(1); });
-                }
-                long now = android.os.SystemClock.elapsedRealtime();
-                if (presented == 1 || now - lastReport >= 50) {
-                    lastReport = now;
-                    events.emit(id, "progress", "{\"decoded\":" + decoded + ",\"presented\":" + presented + "}");
-                }
+                if (coalesce) queuePresentation(id);
+                else if ((result & 0x10000) != 0) onPresented(id);
+                reportProgress(id, false);
             } finally { queuedFrames.decrementAndGet(); queuedBytes.addAndGet(-bytes.length); }
         });
+    }
+
+    private void queuePresentation(String id) {
+        if (presentationPending) return;
+        presentationPending = true;
+        // Append one render behind queued decodes. Never discard predictive HEVC
+        // stripes, but avoid blocking on a full-screen Surface post for each stripe.
+        enqueue(null, () -> {
+            presentationPending = false;
+            if (!active.equals(id) || handle == 0) return;
+            int result = NativeVideo.present(handle);
+            if (result < 0) events.emit(id, "error", "Native presentation failed (" + result + ")");
+            else if ((result & 0x10000) != 0) onPresented(id);
+        });
+    }
+    private void onPresented(String id) {
+        presented++;
+        if (presented == 1) activity.runOnUiThread(() -> { if (active.equals(id) && viewportVisible) clip.setAlpha(1); });
+        reportProgress(id, presented == 1);
+    }
+    private void reportProgress(String id, boolean force) {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (force || now - lastReport >= 50) {
+            lastReport = now;
+            events.emit(id, "progress", "{\"decoded\":" + decoded + ",\"presented\":" + presented + "}");
+        }
     }
 
     /** Emits a queue fence for diagnostics after all previously submitted pictures finish. */
@@ -171,7 +200,10 @@ final class VideoController implements TextureView.SurfaceTextureListener {
         enqueue(null, () -> {
             if (surface != null) surface.release();
             surface = acquired;
-            if (handle != 0) NativeVideo.surface(handle, surface);
+            if (handle != 0) {
+                NativeVideo.surface(handle, surface);
+                if (coalesce && !active.isEmpty()) queuePresentation(active);
+            }
         });
     }
     @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture value) {

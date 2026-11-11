@@ -56,7 +56,7 @@ public final class BenchmarkActivity extends Activity {
         });
         nativeObserver = new BenchmarkSurface(nativeTexture);
         root.addView(nativeTexture, new FrameLayout.LayoutParams(1, 1));
-        video = new VideoController(this, root, this::videoEvent);
+        video = new VideoController(this, root, this::videoEvent, false);
         FrameLayout clip = (FrameLayout)root.getChildAt(root.getChildCount() - 1);
         webTexture = (TextureView)clip.getChildAt(0);
         webObserver = new BenchmarkSurface(webTexture);

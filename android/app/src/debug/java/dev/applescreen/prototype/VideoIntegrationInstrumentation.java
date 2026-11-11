@@ -76,7 +76,7 @@ public final class VideoIntegrationInstrumentation extends Instrumentation {
                 } finally { image.close(); }
             }
         } finally { NativeVideo.destroy(decoder); }
-        require(decoded == 12 && presented == 6, "Incorrect decoded/presented count: " + decoded + "/" + presented);
+        require(decoded == 12 && presented == 11, "Incorrect decoded/presented count: " + decoded + "/" + presented);
         String hash = hex(MessageDigest.getInstance("SHA-256").digest(lastPixels));
         require(EXPECTED_RGBA_SHA256.equals(hash), "Rendered RGBA differs from Mac reference: " + hash);
         return new JSONObject().put("decodedStripes", decoded).put("presentedPictures", presented)
@@ -110,7 +110,7 @@ public final class VideoIntegrationInstrumentation extends Instrumentation {
         }
         return new JSONObject().put("receivedExactBytes", true).put("feedbackExactBytes", true);
     }
-    private static ArrayList<byte[]> accessUnits(byte[] data) {
+    static ArrayList<byte[]> accessUnits(byte[] data) {
         ArrayList<Integer> boundaries = new ArrayList<>();
         for (int offset = 0; offset + 5 < data.length;) {
             int prefix = data[offset] == 0 && data[offset + 1] == 0
@@ -125,7 +125,7 @@ public final class VideoIntegrationInstrumentation extends Instrumentation {
                 index + 1 < boundaries.size() ? boundaries.get(index + 1) : data.length));
         return units;
     }
-    private static String hex(byte[] bytes) {
+    static String hex(byte[] bytes) {
         StringBuilder text = new StringBuilder();
         for (byte value : bytes) text.append(String.format("%02x", value & 0xff));
         return text.toString();

@@ -17,10 +17,13 @@ public:
     bool valid() const { return codec_ != nullptr; }
     void setWindow(ANativeWindow* window);
     // Low 16 bits count decoded stripes; bit 16 means a complete picture was presented.
-    int decode(const uint8_t* bytes, int size, int64_t timestamp, int stripe);
+    int decode(const uint8_t* bytes, int size, int64_t timestamp, int stripe, bool render = true);
+    // Posts the latest composition once; unchanged stripes retain their previous pixels.
+    int present();
 private:
     int paint(int stripe);
     int width_, height_, stripes_;
+    bool dirty_ = false;
     AVCodecContext* codec_ = nullptr;
     AVFrame* frame_ = nullptr;
     SwsContext* scaler_ = nullptr;

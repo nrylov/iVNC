@@ -1,3 +1,39 @@
+# Live High Performance presentation fix — 2026-11-11
+
+Owner reported one picture followed by 0 FPS, later sometimes ~30 FPS. Another
+agent was operating Mac GUI elements; no causal link to that activity is proven.
+Owner also reports High Performance is substantially faster than Standard.
+
+Live inspection found SRTP/assembly/decoding still advancing (7,126 video
+packets, 6,043 decoded stripes, zero authentication failures) while presentation
+lagged at 64 posts. The server advertises four stripes, but regions update
+independently. Native composition incorrectly cleared its initialized-stripe
+mask after every post, requiring unchanged regions to be sent again. Later
+activity also produced an actual Native video backlog exceeded failure.
+
+Fixed: keep initialized regions/pixels across updates; dirty stripes can present
+after the initial full composition. Split decode/composition from presentation;
+the live worker appends one coalesced render behind queued decodes, preserving
+all predictive HEVC data. Surface replacement repaints retained pixels. Replay
+benchmarks explicitly retain eager rendering for matched comparison policy.
+Transport close reasons and last HP failure stats now survive fallback.
+
+Android 0.4-sparse-video is built and installed. Local: 456 Node tests pass,
+including transport close-reason regression. Device: sparse eager, deferred,
+coalescing-worker and Surface reattachment regressions all match an independent
+Mac RGBA reference; existing decoder/JNI/UDP integration also passes. See
+[sparse device evidence](sparse-video-galaxy-s26.json).
+
+Owner reports the installed build maintaining over 60 FPS. Initial live sample
+shows HP 73 fps, decoding/presentation advancing, backlog 5 and no auth failures.
+Owner subsequently confirmed mostly above 60 FPS with dips into the 50s.
+A later queue overflow happened only after switching away (owner confirmed).
+Foreground live sample has 10,796 decoded stripes and 4,776 posts, no auth
+failures or recoveries. Background suspend/reconnect is the next active fix. The badge counts native Surface
+posts, not physical display frames. Standard-mode performance and return-from-
+background reconnect remain separate unresolved work; preserved UI/profile/
+reconnect prototype code is still on prototype-webview, not merged.
+
 # Performance-first milestone — 2026-11-11
 
 Owner asked to compare native versus web performance before proceeding with the

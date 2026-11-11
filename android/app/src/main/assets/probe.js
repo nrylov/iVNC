@@ -10,6 +10,7 @@ import { attachDiagnostics } from './diagnostics.js';
 
 const element = id => document.getElementById(id);
 let rfb = null, channel = null, connected = false, configuration = null;
+let lastHighPerformance = null;
 let videoState = 'disconnected', failureReason = null, lastFrames = 0, lastTime = performance.now();
 function status(message) {
     element('status').textContent = message;
@@ -90,7 +91,10 @@ function connect(config) {
         if (rfb !== current) return;
         videoState = event.detail.state;
         if (videoState === 'streaming') status('High Performance · native software HEVC · virtual display');
-        if (videoState === 'failed') fallback(current, config, event.detail.failure || event.detail.reason || 'media failure');
+        if (videoState === 'failed') {
+            lastHighPerformance = { ...event.detail };
+            fallback(current, config, event.detail.failure || event.detail.reason || 'media failure');
+        }
     });
     current.addEventListener('disconnect', () => {
         if (rfb !== current || config.fallingBack) return;
@@ -104,7 +108,7 @@ function connect(config) {
 }
 element('connection').onsubmit = event => {
     event.preventDefault();
-    failureReason = null;
+    failureReason = null; lastHighPerformance = null;
     const config = { host: element('host').value.trim(), port: Number(element('port').value),
         username: element('username').value, password: element('password').value,
         mode: element('video-mode').value };
@@ -137,7 +141,7 @@ setInterval(() => {
         : connected ? 'Standard' : 'Offline';
     lastFrames = count; lastTime = now;
 }, 1000);
-attachDiagnostics(() => ({ state: videoState, fallbackReason: failureReason,
+attachDiagnostics(() => ({ state: videoState, fallbackReason: failureReason, lastHighPerformance,
     presentedFrames: rfb?._ardHp?._sink?.stats.presented || 0,
     media: rfb?._ardHp?.stats || null }));
 element('settings').showModal();

@@ -34,6 +34,11 @@ Both routes preload the same 90-picture, 1920×1080 HEVC 4:4:4 generated animati
 They loop it in decode order, using one stripe and one production decoder thread.
 Disk I/O, fixture transfer and bitmap hashing are outside the measured replay.
 
+Both benchmark routes deliberately post eagerly per decoded picture. The live
+client now coalesces queued updates to reduce display backpressure; its replay
+controller selects eager mode explicitly to keep the two test routes comparable.
+The published results below predate that live-client coalescing change.
+
 The web route uses `NativeVideoSink`, its real base64 encoder, the JavaScript
 interface and `VideoController` queue. The native route loads compressed packets
 once, then feeds `VideoDecoder` directly in C++, without per-picture JNI or

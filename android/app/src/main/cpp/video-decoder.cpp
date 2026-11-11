@@ -38,11 +38,12 @@ VideoDecoder::~VideoDecoder() {
 
 void VideoDecoder::setWindow(ANativeWindow* window) {
     if (window_) ANativeWindow_release(window_);
+    dirty_ = true; // A replacement Surface needs the current composition even without new video.
     window_ = window; // Ownership of the acquired reference passes to this decoder.
     if (window_) ANativeWindow_setBuffersGeometry(window_, width_, height_, WINDOW_FORMAT_RGBA_8888);
 }
 
-int VideoDecoder::decode(const uint8_t* bytes, int size, int64_t timestamp, int stripe) {
+int VideoDecoder::decode(const uint8_t* bytes, int size, int64_t timestamp, int stripe, bool render) {
     if (!codec_ || stripe < 0 || stripe >= stripes_ || size < 1 || size > 4194304) return -1;
     AVPacket* packet = av_packet_alloc();
     if (!packet) return -2;
@@ -65,7 +66,9 @@ int VideoDecoder::decode(const uint8_t* bytes, int size, int64_t timestamp, int 
         result = ((result & 0xffff) + 1) | (result & 0x10000) | painted;
     }
     if (pending_.size() > 128) return -4;
-    return error == AVERROR(EAGAIN) || error == AVERROR_EOF ? result : error;
+    if (error != AVERROR(EAGAIN) && error != AVERROR_EOF) return error;
+    if (render) result |= present();
+    return result;
 }
 
 int VideoDecoder::paint(int stripe) {
@@ -86,6 +89,14 @@ int VideoDecoder::paint(int stripe) {
     memcpy(pixels_.data() + size_t(y) * width_ * 4, scratch_.data(),
         size_t(std::min(frame_->height, height_ - y)) * width_ * 4);
     seen_[stripe] = true;
+    dirty_ = true;
+    return 0;
+}
+
+int VideoDecoder::present() {
+    if (!dirty_) return 0;
+    // All regions are required only for initialization. Apple subsequently sends
+    // dirty stripes independently; unchanged regions may never arrive again.
     if (!std::all_of(seen_.begin(), seen_.end(), [](bool seen) { return seen; })) return 0;
     if (!window_) return 0; // Keep the completed picture until the TextureView surface is ready.
     // TextureView may resize or replace its surface while the user zooms or switches apps.
@@ -102,6 +113,6 @@ int VideoDecoder::paint(int stripe) {
         memcpy(static_cast<uint8_t*>(buffer.bits) + size_t(row) * buffer.stride * 4,
             pixels_.data() + size_t(row) * width_ * 4, size_t(width_) * 4);
     ANativeWindow_unlockAndPost(window_);
-    std::fill(seen_.begin(), seen_.end(), false);
+    dirty_ = false;
     return 0x10000;
 }

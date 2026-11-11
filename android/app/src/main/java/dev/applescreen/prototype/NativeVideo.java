@@ -20,5 +20,9 @@ final class NativeVideo {
     static native long create(int width, int height, int stripes);
     static native void surface(long handle, Surface surface);
     static native int decode(long handle, byte[] data, long timestamp, int stripe);
+    /** Decodes a dependent stripe without blocking on a display buffer. */
+    static native int decodeOnly(long handle, byte[] data, long timestamp, int stripe);
+    /** Posts the latest composition after queued stripes have caught up. */
+    static native int present(long handle);
     static native void destroy(long handle);
 }

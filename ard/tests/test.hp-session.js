@@ -592,6 +592,12 @@ describe('High Performance session', () => {
         strictEqual(states.filter(s => s.startsWith('failed')).length, 1);
     });
 
+    it('retains the transport close reason for diagnostics', async () => {
+        await negotiate();
+        ws.onclose({ reason: 'UDP receive queue exhausted' });
+        strictEqual(session.failure, 'media-closed: UDP receive queue exhausted');
+    });
+
     it('fails when the sink reports a decoder error', async () => {
         await negotiate();
         sinks[0].opts.onError('boom');

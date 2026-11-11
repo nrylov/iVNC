@@ -3,7 +3,9 @@
 <instrumentation android:name=".NativeDecodeInstrumentation" android:targetPackage="dev.applescreen.prototype" android:label="Synthetic HEVC decoder tests" />
 <instrumentation android:name=".VideoIntegrationInstrumentation" android:targetPackage="dev.applescreen.prototype" android:label="Native video integration tests" />
 <instrumentation android:name=".VideoBenchmarkInstrumentation" android:targetPackage="dev.applescreen.prototype" android:label="Video route comparison" />
+<instrumentation android:name=".SparseVideoInstrumentation" android:targetPackage="dev.applescreen.prototype" android:label="Sparse video regression tests" />
 <application>
+    <activity android:name=".VideoWorkerTestActivity" android:exported="false" />
     <activity android:name=".BenchmarkActivity" android:exported="false" android:screenOrientation="landscape" android:configChanges="orientation|screenSize" />
 </application>
 </manifest>

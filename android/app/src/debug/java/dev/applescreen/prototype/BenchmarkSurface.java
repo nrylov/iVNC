@@ -31,17 +31,26 @@ final class BenchmarkSurface implements TextureView.SurfaceTextureListener {
             .put("observationTailMs", (endNs - lastPostNs) / 1e6);
     }
     static String pixelHash(TextureView texture) throws Exception {
-        Bitmap bitmap = texture.getBitmap(1920, 1080);
+        return pixelHash(texture, 1920, 1080, false);
+    }
+    static String pixelHashForTest(TextureView texture, int width, int height) throws Exception {
+        return pixelHash(texture, width, height, true);
+    }
+    private static String pixelHash(TextureView texture, int width, int height, boolean rgba) throws Exception {
+        Bitmap bitmap = texture.getBitmap(width, height);
         if (bitmap == null) throw new IllegalStateException("No texture bitmap");
         try {
             MessageDigest hash = MessageDigest.getInstance("SHA-256");
-            int[] row = new int[1920];
-            byte[] bytes = new byte[1920 * 4];
-            for (int y = 0; y < 1080; y++) {
-                bitmap.getPixels(row, 0, 1920, 0, y, 1920, 1);
+            int[] row = new int[width];
+            byte[] bytes = new byte[width * 4];
+            for (int y = 0; y < height; y++) {
+                bitmap.getPixels(row, 0, width, 0, y, width, 1);
                 for (int x = 0; x < row.length; x++) {
                     int value = row[x];
-                    for (int channel = 0; channel < 4; channel++) bytes[x * 4 + channel] = (byte)(value >>> (channel * 8));
+                    for (int channel = 0; channel < 4; channel++) {
+                        int shift = rgba && channel < 3 ? (2 - channel) * 8 : channel * 8;
+                        bytes[x * 4 + channel] = (byte)(value >>> shift);
+                    }
                 }
                 hash.update(bytes);
             }
