@@ -1,9 +1,10 @@
 /* Android trackpad UI adapter for pinned noVNC-ARD. No upstream files are changed.
  * Private RFB pointer/display APIs are confined here; ARD retains button mapping. */
 import { TrackpadModel } from './trackpad-model.js';
+import { FullscreenPointer } from './fullscreen-pointer.js';
 
 /** Attaches relative input, separate click/drag controls, and a visible cursor. */
-export function attachTrackpad({ getRfb, isConnected }) {
+export function attachTrackpad({ getRfb, isConnected, onPinch }) {
     const pad = document.getElementById('trackpad');
     const screen = document.getElementById('screen');
     const mode = document.getElementById('pointer-mode');
@@ -39,6 +40,17 @@ export function attachTrackpad({ getRfb, isConnected }) {
             }));
         },
     });
+    const desktop = new FullscreenPointer(model, onPinch);
+    const enabled = () => isConnected() && mode.value === 'trackpad';
+    screen.addEventListener('pointerdown', event => {
+        if (!enabled()) return;
+        event.preventDefault(); screen.setPointerCapture(event.pointerId);
+        desktop.down(event.pointerId, event.clientX, event.clientY, event.timeStamp);
+    }, true);
+    screen.addEventListener('pointermove', event => { if (enabled()) desktop.move(event.pointerId, event.clientX, event.clientY); }, true);
+    screen.addEventListener('pointerup', event => { if (enabled()) desktop.up(event.pointerId, event.timeStamp); }, true);
+    screen.addEventListener('pointercancel', () => desktop.cancel(), true);
+    screen.addEventListener('lostpointercapture', event => { if (desktop.points.has(event.pointerId)) desktop.cancel(); }, true);
     function paint() {
         const rfb = getRfb();
         const active = isConnected() && mode.value === 'trackpad';
@@ -53,7 +65,7 @@ export function attachTrackpad({ getRfb, isConnected }) {
         cursor.style.top = `${canvas.top - frame.top + model.y * rfb._display.scale}px`;
     }
     function update() {
-        model.cancel();
+        desktop.cancel();
         drag.setAttribute('aria-pressed', 'false');
         const active = mode.value === 'trackpad';
         document.getElementById('trackpad-controls').hidden = !active;
@@ -85,7 +97,7 @@ export function attachTrackpad({ getRfb, isConnected }) {
         drag.setAttribute('aria-pressed', String(model.dragging));
     });
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) { model.cancel(); drag.setAttribute('aria-pressed', 'false'); }
+        if (document.hidden) { desktop.cancel(); drag.setAttribute('aria-pressed', 'false'); }
     });
     document.getElementById('left-click').onclick = () => model.click(1);
     document.getElementById('right-click').onclick = () => model.click(4);

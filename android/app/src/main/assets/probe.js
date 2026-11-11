@@ -7,6 +7,7 @@ import { attachTrackpad } from './trackpad.js';
 import { attachZoom } from './zoom.js';
 import { configureVideo } from './high-performance.js';
 import { attachDiagnostics } from './diagnostics.js';
+import { attachKeyboard } from './keyboard.js';
 import { ReconnectPolicy } from './reconnect-policy.js';
 import { restoreProfile, saveProfile, forgetProfile } from './profiles.js';
 
@@ -22,18 +23,19 @@ function setConnected(value) {
     connected = value;
     for (const id of ['send', 'get', 'sync', 'cmdc', 'cmdv']) element(id).disabled = !value;
     element('connect').disabled = value;
-    trackpad.update();
+    trackpad.update(); keyboard.update();
 }
-const trackpad = attachTrackpad({ getRfb: () => rfb, isConnected: () => connected });
 const zoom = attachZoom(() => rfb);
+const trackpad = attachTrackpad({ getRfb: () => rfb, isConnected: () => connected, onPinch: event => zoom.pinch(event) });
+const keyboard = attachKeyboard(() => rfb, () => connected);
 const reconnect = new ReconnectPolicy({ connect, disconnect: () => stopSession('Paused; reconnecting when you return') });
 window.appLifecycle = state => {
     reconnect.enabled = element('auto-reconnect').checked;
-    if (state === 'background') reconnect.pause(); else reconnect.resume();
+    if (state === 'background') { keyboard.release(); reconnect.pause(); } else reconnect.resume();
 };
 document.addEventListener('visibilitychange', () => window.appLifecycle(document.hidden ? 'background' : 'foreground'));
 function stopSession(message) {
-    configuration = null;
+    keyboard.release(); configuration = null;
     const previous = rfb; rfb = null;
     previous?.disconnect(); channel?.close(); setConnected(false);
     videoState = 'disconnected'; status(message);
@@ -132,7 +134,7 @@ element('connection').onsubmit = event => {
     element('password').value = '';
     connect(config);
 };
-element('disconnect').onclick = () => { reconnect.stop(); status('Disconnected'); };
+element('disconnect').onclick = () => { reconnect.stop(); status('Disconnected'); element('settings').showModal(); };
 element('settings-open').onclick = () => element('settings').showModal();
 element('settings-close').onclick = () => element('settings').close();
 element('send').onclick = () => Native.getClipboard(channel.id);
@@ -167,3 +169,12 @@ element('auto-reconnect').onchange = () => {
 };
 restoreProfile(); trackpad.update();
 element('settings').showModal();
+
+// Native popup stays above the native video Surface; DOM controls remain shared.
+window.viewerAction = action => {
+    if (action === 'connection') { keyboard.close(); element('settings').showModal(); }
+    else if (action === 'about') element('about').showModal();
+    else element(action)?.click();
+};
+element('about-close').onclick = () => element('about').close();
+element('settings').insertBefore(element('status'), element('connection'));

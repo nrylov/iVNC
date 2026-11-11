@@ -1,3 +1,28 @@
+# Fullscreen viewer and native experiment — 2026-11-11
+
+Owner verified encrypted save + foreground reconnect work. Requested fullscreen
+desktop, an unobtrusive control button, and whole-screen trackpad. Implemented
+Android 0.6.0-preview.1: screen occupies the full WebView viewport, dedicated pad
+hidden, translucent native popup button stays above the native video layer.
+Popup exposes connection, keyboard, zoom/click/clipboard controls and About.
+Credits/app version moved into About. Added advanced keyboard from preserved
+prototype code and separate pinch/scroll/right-tap gesture recognition.
+
+472 Node tests pass; debug APK builds/installed. Device viewport check: desktop
+fills 384×795 CSS pixels with no dedicated pad. Owner found continuous drags
+stopped after a tiny segment. Traced actual pointercancel after browser touch
+slop: nested noVNC scroll container had touch-action:auto. Fixed the entire
+relative-input subtree to touch-action:none; applied via existing stylesheet
+CSSOM to verify without interrupting session. ADB movement-only swipe then ended
+with pointerup instead of pointercancel; owner independently confirmed normal
+trackpad movement. Source fix must be included in the next APK build.
+
+Owner selected trying an actual LibVNCClient native version before deciding
+which base to keep. DO NOT publish a release yet: owner explicitly chose waiting
+until native is tried and the base selected. GitHub APK release requested after
+that decision. Current working prototype remains the fallback. Start a separate
+native Android app/module with no noVNC runtime. No other agents are being used.
+
 # Saved login and lifecycle milestone — 2026-11-11
 
 Owner confirmed the post-rendering-fix queue overflow happened ONLY after

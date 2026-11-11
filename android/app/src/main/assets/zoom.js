@@ -26,40 +26,20 @@ export function attachZoom(getRfb) {
         const rfb = getRfb();
         if (rfb) rfb._screen.scrollLeft = rfb._screen.scrollTop = 0;
     };
-    const relative = () => document.getElementById('pointer-mode').value === 'trackpad';
-    function points(event) { return [...event.touches].map(touch => ({ x: touch.clientX, y: touch.clientY })); }
-    function begin(event) {
-        if (!relative()) return;
-        event.preventDefault(); event.stopPropagation();
-        const touches = points(event), rfb = getRfb();
-        if (!rfb || !touches.length) { gesture = null; return; }
-        if (touches.length >= 2) {
-            const [a, b] = touches;
-            const x = (a.x + b.x) / 2, y = (a.y + b.y) / 2;
+    let pinchGesture = null;
+    function pinch(event) {
+        const rfb = getRfb();
+        if (!rfb) return;
+        if (event.phase === 'start') {
             const box = rfb._canvas.getBoundingClientRect();
-            gesture = { type: 'pinch', zoom, distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
-                u: (x - box.left) / Math.max(1, box.width), v: (y - box.top) / Math.max(1, box.height) };
-        } else gesture = { type: 'pan', ...touches[0] };
-    }
-    screen.addEventListener('touchstart', begin, { capture: true, passive: false });
-    screen.addEventListener('touchmove', event => {
-        if (!relative()) return;
-        event.preventDefault(); event.stopPropagation();
-        const touches = points(event), rfb = getRfb();
-        if (!gesture || !rfb) return;
-        if (gesture.type === 'pinch' && touches.length >= 2) {
-            const [a, b] = touches;
-            apply(gesture.zoom * Math.hypot(a.x - b.x, a.y - b.y) / gesture.distance,
-                { u: gesture.u, v: gesture.v, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-        } else if (touches.length === 1 && gesture.type === 'pan') {
-            rfb._screen.scrollLeft -= touches[0].x - gesture.x;
-            rfb._screen.scrollTop -= touches[0].y - gesture.y;
-            gesture = { type: 'pan', ...touches[0] };
-            window.dispatchEvent(new Event('desktopgeometry'));
+            pinchGesture = { zoom, distance: event.distance,
+                u: (event.x - box.left) / Math.max(1, box.width),
+                v: (event.y - box.top) / Math.max(1, box.height) };
+        } else if (pinchGesture) {
+            apply(pinchGesture.zoom * event.distance / pinchGesture.distance,
+                { ...pinchGesture, x: event.x, y: event.y });
         }
-    }, { capture: true, passive: false });
-    screen.addEventListener('touchend', begin, { capture: true, passive: false });
-    screen.addEventListener('touchcancel', () => { gesture = null; }, true);
+    }
     // Upstream can reset scale on a framebuffer resize; reapply local zoom after it does.
     let last = '';
     function monitor() {
@@ -69,5 +49,5 @@ export function attachZoom(getRfb) {
         requestAnimationFrame(monitor);
     }
     monitor();
-    return { reset: () => apply(1) };
+    return { reset: () => apply(1), pinch };
 }

@@ -27,6 +27,7 @@ public final class MainActivity extends Activity {
         view.setWebViewClient(new AssetClient(getAssets()));
         frame.addView(view, new FrameLayout.LayoutParams(-1, -1));
         VideoController video = new VideoController(this, frame, (id, kind, value) -> emit("videoEvent", id, kind, value));
+        ViewerMenu.attach(this, frame, action -> view.evaluateJavascript("window.viewerAction?.(" + JSONObject.quote(action) + ")", null));
         bridge = new SessionBridge(this, video, this::emit);
         view.addJavascriptInterface(bridge, "Native");
         frame.setOnApplyWindowInsetsListener((v, insets) -> {
@@ -39,6 +40,8 @@ public final class MainActivity extends Activity {
         getWindow().setNavigationBarContrastEnforced(false);
         getWindow().getDecorView().getWindowInsetsController().setSystemBarsAppearance(0,
             WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+        getWindow().getDecorView().getWindowInsetsController().setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        getWindow().getDecorView().getWindowInsetsController().hide(WindowInsets.Type.systemBars());
         view.loadUrl(AssetClient.ORIGIN + "/probe.html");
     }
     private void emit(String function, String id, String kind, String value) {
