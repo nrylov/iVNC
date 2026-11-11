@@ -1,6 +1,6 @@
 # iVNC Native experiment
 
-Standalone Android client using the pinned LibVNCClient core. Own Java Views UI,
+Standalone Android client using the pinned LibVNCClient core. Own Java Views UI (password input explicitly masked),
 C++ socket/protocol/framebuffer path, and platform Java cryptography for Apple's
 RSA type-33 login. No WebView, JavaScript, noVNC or AVNC app/UI code is packaged.
 
@@ -19,11 +19,13 @@ Build using existing project-local tools:
 
 The wrapper prepares an ignored `.dev/libvncclient-source` copy at upstream commit
 `98aaee0560baa0332339b2ef464ea96ed9b9b28c`, then applies the small exact-read patch
-in `scripts/prepare-libvncclient.py`. The checked-in submodule stays unchanged.
+in `scripts/prepare-libvncclient.py` (patch identity `socket-idle-rsa33-v3`). The checked-in submodule stays unchanged.
 Upstream's `WaitForMessage` returns immediately for cached bytes; exact reads
 must instead wait on the socket when their cached bytes form only a partial
 message. Otherwise fragmented TCP input can spin through its retry budget and
-fail authentication immediately. The patched copy splits these two waits.
+fail authentication immediately. Successful reads also reset the idle retry
+budget; healthy fragmented transfers must not exhaust it. A regression spans both
+small and large native read paths and was verified to fail before this fix. The patched copy splits these two waits.
 
 ## Validation
 
@@ -38,7 +40,21 @@ pixels, authentication, pointer coordinates and socket-worker cancellation.
   dev.ivnc.nativeclient/.NativeIntegrationInstrumentation
 ```
 
-A real Mac session is the next check. A passing synthetic exchange does not
+The native real-Mac public-key probe now passes without sending credentials.
+It verified two compatibility fixes: defer the security-type byte into the first
+RSA request write, and accept the Mac's SPKI-wrapped RSA key as well as PKCS#1.
+Authentication failures are distinguished from later session setup; Apple's
+rejection does not require a standard RFB failure-reason string.
+
+Additional debug regressions check actual password masking after dialog setup,
+no password view-state saving, both RSA formats, and rejection handling. The owner has now verified real Mac login and framebuffer updates at 1920×1080.
+The first native Standard-mode run posts roughly 26–29 updates/second; this is
+not yet a performance-equivalent implementation of the enhanced hybrid client.
+
+The **Debug log** button opens the recent connection history with **Copy** and
+**Clear**. It is memory-only and excludes addresses, credentials, keys and screen
+contents. Selected numeric protocol errors are captured; raw library logging is
+not forwarded. A passing synthetic exchange does not
 establish support for every Apple session setup or extension. No owner login,
 clipboard contents, screen recording or session keys appear in this test.
 

@@ -26,6 +26,8 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private TextureView texture;
     private Surface surface;
     private TextView status;
+    private DebugLog debugLog;
+    private AlertDialog debugDialog;
     private int width=1920,height=1080;
     private float cursorX=960,cursorY=540,lastX,lastY,downX,downY;
     private long downAt;
@@ -33,21 +35,46 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private EditText host,port,user,password;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
+        String version="unknown";
+        try{version=getPackageManager().getPackageInfo(getPackageName(),0).versionName;}catch(android.content.pm.PackageManager.NameNotFoundException ignored){}
+        debugLog=new DebugLog("iVNC Native "+version+" · "+android.os.Build.MANUFACTURER+" "+android.os.Build.MODEL+
+            " · Android "+android.os.Build.VERSION.RELEASE+" (API "+android.os.Build.VERSION.SDK_INT+")");
         FrameLayout root=new FrameLayout(this);
         root.setBackgroundColor(0xff080d14);
         texture=new TextureView(this);texture.setSurfaceTextureListener(this);
         root.addView(texture,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout bar=new LinearLayout(this);bar.setOrientation(LinearLayout.VERTICAL);bar.setBackgroundColor(0xd0101b2a);
-        status=new TextView(this);status.setText("Native LibVNCClient experiment — Standard mode");bar.addView(status);
-        Button connection=new Button(this);connection.setText("Connection");connection.setOnClickListener(v->connectionDialog());bar.addView(connection);
+        status=new TextView(this);status.setTag("native-status");status.setText("Native LibVNCClient experiment — Standard mode");bar.addView(status);
+        Button connection=new Button(this);connection.setText("Connection");connection.setOnClickListener(v->connectionDialog());
+        Button log=new Button(this);log.setText("Debug log");log.setTag("native-debug-log");log.setOnClickListener(v->showDebugLog());
+        LinearLayout actions=new LinearLayout(this);actions.addView(connection,new LinearLayout.LayoutParams(0,-2,1));
+        actions.addView(log,new LinearLayout.LayoutParams(0,-2,1));bar.addView(actions);
         root.addView(bar,new FrameLayout.LayoutParams(-1,-2));
         texture.setOnTouchListener(this::touch);
         setContentView(root);
         host=field("Mac address",InputType.TYPE_CLASS_TEXT);port=field("Port",InputType.TYPE_CLASS_NUMBER);port.setText("5900");
         user=field("Mac username",InputType.TYPE_CLASS_TEXT);password=field("Mac password",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        password.setTransformationMethod(android.text.method.PasswordTransformationMethod.getInstance());
+        password.setTag("native-password");
+        password.setSaveEnabled(false);
+        password.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         connectionDialog();
     }
-    private EditText field(String hint,int type){EditText input=new EditText(this);input.setHint(hint);input.setInputType(type);input.setSingleLine();return input;}
+    private void showDebugLog(){
+        TextView text=new TextView(this);text.setTag("native-debug-text");text.setText(debugLog.snapshot());text.setTextIsSelectable(true);
+        text.setTypeface(android.graphics.Typeface.MONOSPACE);text.setTextSize(12);text.setPadding(24,16,24,16);
+        android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(text);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Native connection log").setView(scroll)
+            .setPositiveButton("Copy",null).setNeutralButton("Clear",null).setNegativeButton("Close",null).create();
+        debugDialog=dialog;dialog.show();
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                android.content.ClipboardManager clipboard=getSystemService(android.content.ClipboardManager.class);
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("iVNC native debug log",text.getText()));
+                android.widget.Toast.makeText(this,"Debug log copied",android.widget.Toast.LENGTH_SHORT).show();
+            });
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->{debugLog.clear();text.setText(debugLog.snapshot());});
+    }
+    private EditText field(String hint,int type){EditText input=new EditText(this);input.setHint(hint);input.setSingleLine();input.setInputType(type);return input;}
     private void connectionDialog(){
         LinearLayout fields=new LinearLayout(this);fields.setPadding(24,12,24,0);fields.setOrientation(LinearLayout.VERTICAL);
         for(EditText input:new EditText[]{host,port,user,password}){
@@ -75,7 +102,8 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         });
     }
     private void event(String kind,String value){
-        if(kind.equals("error"))errorShown=true;
+        debugLog.add(kind,value);
+        if(kind.equals("error")){if(errorShown)return;errorShown=true;}
         else if(kind.equals("status")&&value.startsWith("Connecting"))errorShown=false;
         else if(kind.equals("status")&&errorShown)return;
         if(kind.equals("size")){

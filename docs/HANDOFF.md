@@ -1,3 +1,60 @@
+# Native desktop now connects; Standard performance investigation — 2026-11-11
+
+Native 0.4-native-stream-fix is installed and owner confirmed sign-in/desktop.
+Auth fixes: type33 selection + first RSA request in one write, SPKI/PKCS1 keys,
+explicit password masking/state saving disabled. Debug log popup retains safe
+metadata stages and protocol errors with Copy/Clear; tested on real Android UI.
+
+Owner's 0.3 log proved login accepted and 1920x1080 ServerInit, then premature
+read timeout. Added a continuously fragmented key (>8KiB) and frame (<8KiB)
+regression: old library failed while receiving data. Both exact-read loops now
+reset retry budget after successful bytes (socket-idle-rsa33-v3). Same Galaxy
+fragmented transfer now passes, as do masking/log UI and auth rejection tests.
+Native 0.4 owner log shows 660 Surface posts over ~25 seconds (~26.4/sec).
+
+Owner says working client was also faster in Standard mode at some point. Do
+NOT attribute the performance gap solely to HP vs Standard. Existing client uses
+Apple 3.889 enhanced setup, push updates and adaptive codecs; native uses basic
+3.8/ZRLE request-driven updates. Also just found native library C decoder files
+compile with Debug flags but NO optimization; -O3 was applied only to C++ JNI.
+Next immediate step: optimize actual vncclient C target and add CPU/read/render
+metrics before judging performance or jumping straight to HP port.
+
+Release remains ON HOLD until a base is selected. Native still lacks Apple HP,
+clipboard/keyboard and secure profiles/reconnect; working hybrid retains these
+verified pieces. No real credentials, addresses, keys or screen captures in logs.
+
+# Native auth framing, RSA wrappers and password masking — 2026-11-11
+
+Owner reported native setup failure and visible password text. Fixed password
+field setup order: setSingleLine no longer overrides its password transform;
+explicit PasswordTransformationMethod, no password view-state saving, and no
+IME personalized learning. Device regression creates fresh synthetic input and
+checks actual masking after dialog attachment. It never reads owner passwords.
+
+Public-key-only exchanges with the actual Mac proved it closes the connection
+when type33 selection and the first RSA request are written separately. Defers
+type33 selection in patched LibVNCClient and prepends it to the request. Mac
+also sends an SPKI-wrapped RSA key (294 bytes), which native code previously
+only parsed as bare PKCS#1. Android KeyFactory now supports both; fallback uses
+a fresh factory because a failed lookup can exhaust provider fallback state.
+Library hook captures numeric SecurityResult and skips Apple's nonexistent
+failure-reason string, distinguishing rejected auth from session initialization.
+Specific errors are retained instead of overwritten by generic cleanup status.
+
+Installed Native 0.2-native-auth-fix. Real Galaxy tests pass: password mask/state
+saving, SPKI and PKCS1 RSA/AES auth + exact framebuffer/queued input/cancellation,
+and rejection without a reason. A native probe against the REAL Mac now exchanges
+and parses its public key successfully, sending NO username/password/credential
+envelope. Full user login is still pending; owner was asked to retry in updated
+Native app and report any new precise error. Working hybrid app untouched.
+
+Patch identity is socket-wait-rsa33-v2, generated only in ignored .dev copy.
+Pinned submodule stays unmodified. See updated native device evidence JSON.
+No release: owner explicitly holds publication until native is evaluated and a
+base chosen. Next: consume owner's full-login result and address any actual
+Apple session/display setup requirement. Do not claim native HP/clipboard ready.
+
 # Native LibVNCClient core built and tested — 2026-11-11
 
 Created separate module android/native-app, package dev.ivnc.nativeclient, label

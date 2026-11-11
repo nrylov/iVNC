@@ -23,13 +23,17 @@ final class SyntheticRfbServer implements AutoCloseable {
     volatile String stage="accept";
     private volatile Socket socket;
     private final Thread thread;
-    SyntheticRfbServer() throws Exception {
+    private final boolean wrappedKey, rejectLogin, fragmented;
+    SyntheticRfbServer(boolean wrappedKey) throws Exception { this(wrappedKey,false); }
+    SyntheticRfbServer(boolean wrappedKey,boolean rejectLogin) throws Exception {this(wrappedKey,rejectLogin,false);}
+    SyntheticRfbServer(boolean wrappedKey,boolean rejectLogin,boolean fragmented) throws Exception {
+        this.wrappedKey=wrappedKey;this.rejectLogin=rejectLogin;this.fragmented=fragmented;
         listener=new ServerSocket(0,1,java.net.InetAddress.getByName("127.0.0.1"));
         thread=new Thread(()->{try{serve();}catch(Throwable error){if(!listener.isClosed())failure=error;}},"synthetic-rfb");
         thread.start();
     }
     private void serve() throws Exception {
-        socket=listener.accept();socket.setSoTimeout(10000);
+        socket=listener.accept();socket.setSoTimeout(10000);socket.setTcpNoDelay(true);
         DataInputStream input=new DataInputStream(socket.getInputStream());DataOutputStream output=new DataOutputStream(socket.getOutputStream());
         output.writeBytes("RFB 003.889\n");output.flush();
         require(new String(input.readNBytes(12),java.nio.charset.StandardCharsets.US_ASCII).equals("RFB 003.008\n"),"Unexpected version");
@@ -37,8 +41,13 @@ final class SyntheticRfbServer implements AutoCloseable {
         byte[] request=input.readNBytes(14);require(request.length==14&&request[3]==10&&request[6]=='R',"Invalid key request");
         stage="RSA request received";KeyPairGenerator generator=KeyPairGenerator.getInstance("RSA");generator.initialize(2048);KeyPair pair=generator.generateKeyPair();
         RSAPublicKey publicKey=(RSAPublicKey)pair.getPublic();
-        byte[] key=der(0x30,join(der(2,publicKey.getModulus().toByteArray()),der(2,publicKey.getPublicExponent().toByteArray())));
-        output.writeInt(key.length+6);output.write(new byte[]{1,0,0,0});output.writeShort(key.length);output.write(key);output.flush();
+        byte[] key=wrappedKey ? publicKey.getEncoded() : der(0x30,join(der(2,publicKey.getModulus().toByteArray()),der(2,publicKey.getPublicExponent().toByteArray())));
+        ByteArrayOutputStream response=new ByteArrayOutputStream();DataOutputStream keyBody=new DataOutputStream(response);
+        keyBody.write(new byte[]{1,0,0,0});keyBody.writeShort(key.length);keyBody.write(key);
+        // Exercise a read larger than the library's 8 KiB receive buffer too.
+        if(fragmented)keyBody.write(new byte[8192]);
+        byte[] body=response.toByteArray();output.writeInt(body.length);output.flush();
+        sendBody(output,body,64);
         stage="RSA key sent";int size=input.readInt();require(size>138&&size<2048,"Credential envelope size invalid");byte[] blob=input.readNBytes(size);
         require(blob.length==size&&blob[6]==0&&blob[7]==1,"Credential envelope malformed");
         int wrapped=(blob[136]&255)|((blob[137]&255)<<8);require(wrapped==blob.length-138,"Wrapped key length invalid");
@@ -46,7 +55,8 @@ final class SyntheticRfbServer implements AutoCloseable {
         byte[] aes=rsa.doFinal(blob,138,wrapped);Cipher cipher=Cipher.getInstance("AES/ECB/NoPadding");cipher.init(Cipher.DECRYPT_MODE,new SecretKeySpec(aes,"AES"));
         byte[] plain=cipher.doFinal(blob,8,128);
         require(zeroString(plain,0).equals("synthetic-user")&&zeroString(plain,64).equals("synthetic-password"),"Login did not round trip");
-        stage="credentials verified";authenticated=true;output.writeInt(0);output.writeInt(0);output.flush();
+        stage="credentials verified";authenticated=true;output.writeInt(0);output.writeInt(rejectLogin?1:0);output.flush();
+        if(rejectLogin){stage="authentication rejected";input.read();return;}
         input.readUnsignedByte(); // shared flag
         output.writeShort(32);output.writeShort(32);
         output.write(new byte[]{32,24,0,1,0,(byte)255,0,(byte)255,0,(byte)255,0,8,16,0,0,0});
@@ -62,9 +72,17 @@ final class SyntheticRfbServer implements AutoCloseable {
             else throw new IllegalStateException("Unexpected client message "+type);
         }
     }
-    private static void frame(DataOutputStream output) throws Exception {
+    private void frame(DataOutputStream output) throws Exception {
         output.write(new byte[]{0,0,0,1});output.writeShort(0);output.writeShort(0);output.writeShort(32);output.writeShort(32);output.writeInt(0);
-        for(int pixel=0;pixel<32*32;pixel++)output.write(new byte[]{(byte)241,64,32,0});output.flush();
+        byte[] pixels=new byte[32*32*4];
+        for(int offset=0;offset<pixels.length;offset+=4){pixels[offset]=(byte)241;pixels[offset+1]=64;pixels[offset+2]=32;}
+        sendBody(output,pixels,32);
+    }
+    private void sendBody(DataOutputStream output,byte[] body,int chunk) throws Exception {
+        if(!fragmented){output.write(body);output.flush();return;}
+        for(int offset=0;offset<body.length;offset+=chunk){
+            output.write(body,offset,Math.min(chunk,body.length-offset));output.flush();Thread.sleep(8);
+        }
     }
     private static byte[] der(int tag,byte[] value) throws Exception {
         ByteArrayOutputStream out=new ByteArrayOutputStream();out.write(tag);

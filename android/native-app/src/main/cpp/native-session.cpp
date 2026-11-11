@@ -5,17 +5,38 @@
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
+#include <cstdarg>
 
 namespace {
-void quiet(const char*,...){}
+thread_local NativeSession* loggingOwner=nullptr;
+void protocolLog(const char* format,...){
+    // Deliberately whitelist metadata-only formats. Never forward desktop names,
+    // failure-reason strings, clipboard/chat text, hostnames or arbitrary payloads.
+    const char* allowed[]={"Unknown message type %d from VNC server\n","Unknown rect encoding %d\n",
+        "Rect too large: %dx%d at (%d, %d)\n","Connection timed out\n","VNC server closed connection\n",
+        "Got new framebuffer size: %dx%d\n","Updated desktop size: %dx%d\n"};
+    bool safe=false;for(const char* candidate:allowed)if(strcmp(candidate,format)==0){safe=true;break;}
+    if(!safe||!loggingOwner)return;
+    char message[256];va_list args;va_start(args,format);vsnprintf(message,sizeof(message),format,args);va_end(args);
+    loggingOwner->emit("protocol",message);
+}
 NativeSession* owner(rfbClient* client){return static_cast<NativeSession*>(rfbClientGetClientData(client,nullptr));}
 rfbBool allocate(rfbClient* client){
-    if(client->width<1||client->height<1||client->width>4096||client->height>4096||int64_t(client->width)*client->height>8388608)return FALSE;
+    if(client->width<1||client->height<1||client->width>4096||client->height>4096||int64_t(client->width)*client->height>8388608){
+        char error[128];snprintf(error,sizeof(error),"Unsupported native framebuffer size: %d x %d",client->width,client->height);
+        owner(client)->emit("error",error);return FALSE;
+    }
     free(client->frameBuffer);client->frameBuffer=static_cast<uint8_t*>(calloc(size_t(client->width)*client->height,4));
     char geometry[64];snprintf(geometry,sizeof(geometry),"%d,%d",client->width,client->height);owner(client)->emit("size",geometry);
     return client->frameBuffer?TRUE:FALSE;
 }
 void finished(rfbClient* client){owner(client)->present();}
+}
+extern "C" void ivncAuthenticationResult(rfbClient* client, uint32_t result) {
+    auto* session=owner(client);
+    session->authenticationResult=static_cast<int>(result);
+    session->phase=result==0 ? "initializing the Mac session" : "checking the Mac login";
+    if(result==0)session->emit("status","Mac accepted the login; initializing session");
 }
 void NativeSession::emit(const char* kind,const char* value){
     jclass type=env->GetObjectClass(events);jmethodID callback=env->GetMethodID(type,"event","(Ljava/lang/String;Ljava/lang/String;)V");
@@ -26,8 +47,11 @@ void NativeSession::emit(const char* kind,const char* value){
 void NativeSession::stop(){running=false;int fd=socket.load();if(fd>=0)shutdown(fd,SHUT_RDWR);}
 void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,jstring pass,jobject surface){
     env=current;username=user;password=pass;
-    rfbClientLog=quiet;rfbClientErr=quiet;registerAppleAuth();
-    client=rfbGetClient(8,3,4);rfbClientSetClientData(client,nullptr,this);
+    loggingOwner=this;rfbClientLog=protocolLog;rfbClientErr=protocolLog;registerAppleAuth();
+    client=rfbGetClient(8,3,4);
+    if(!client){emit("error","Could not allocate native VNC client");loggingOwner=nullptr;return;}
+    rfbClientSetClientData(client,nullptr,this);
+    free(client->serverHost);
     client->serverHost=strdup(host);client->serverPort=port;client->connectTimeout=5;client->readTimeout=5;
     client->MallocFrameBuffer=allocate;client->FinishedFrameBufferUpdate=finished;
     client->appData.encodingsString="zrle hextile copyrect raw";
@@ -40,21 +64,32 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
     if(!rfbClientConnect(client)){emit("error","Native TCP connection failed");}
     else {
         socket=client->sock;
-        if(!running||!rfbClientInitialise(client))emit("error","Native authentication/session setup failed");
+        if(!running||!rfbClientInitialise(client)) {
+            if(running && !publicKeyProbed) {
+                char message[192];
+                if(authenticationResult>0)snprintf(message,sizeof(message),"Mac rejected authentication (status %d)",authenticationResult);
+                else snprintf(message,sizeof(message),"Native connection failed while %s",phase);
+                emit("error",message);
+            }
+        }
         else {
             emit("status","Native standard VNC connected; Apple extensions pending");
             while(running){
                 {std::deque<Pointer> commands;{std::lock_guard<std::mutex> guard(inputMutex);commands.swap(input);}
                     for(const auto& p:commands)if(!SendPointerEvent(client,p.x,p.y,p.buttons)){running=false;break;}}
                 int ready=client->buffered?1:WaitForMessage(client,10000);
-                if(ready<0||(ready>0&&!HandleRFBServerMessage(client)))break;
+                if(ready<0){if(running)emit("error","Native socket wait failed; see Debug log");break;}
+                if(ready>0&&!HandleRFBServerMessage(client)){
+                    if(running)emit("error","Native VNC message handling failed; see Debug log");
+                    break;
+                }
             }
         }
     }
     socket=-1;
     if(window){ANativeWindow_release(window);window=nullptr;}
     free(client->frameBuffer);client->frameBuffer=nullptr;rfbClientCleanup(client);client=nullptr;
-    emit("status","Native connection ended");
+    emit("status","Native connection ended");loggingOwner=nullptr;
 }
 void NativeSession::present(){
     if(!window||!client->frameBuffer||!running)return;

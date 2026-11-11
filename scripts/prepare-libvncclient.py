@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parent.parent
 SOURCE=ROOT/'third_party/libvncserver'
 OUTPUT=ROOT/'.dev/libvncclient-source'
 REVISION='98aaee0560baa0332339b2ef464ea96ed9b9b28c'
-PATCH='socket-wait-v1'
+PATCH='socket-idle-rsa33-v3'
 identity=REVISION+' '+PATCH
 if subprocess.check_output(['git','-C',str(SOURCE),'rev-parse','HEAD'],text=True).strip()!=REVISION:
     raise SystemExit('LibVNCClient revision differs from the reviewed pin')
@@ -41,6 +41,27 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
   return ivncWaitSocket(client,usecs);
 }
 '''
+    # The timeout is idle time, not the number of waits across a healthy
+    # fragmented transfer. Reset both exact-read loops after forward progress.
+    small='      client->buffered += i;'
+    large='      out += i;\n      n -= i;'
+    assert source.count(small)==1 and source.count(large)==1
+    source=source.replace(small,'      if (i > 0) retries = 0;\n'+small)
+    source=source.replace(large,'      if (i > 0) retries = 0;\n'+large)
+    path.write_text(source)
+    path=OUTPUT/'src/libvncclient/rfbclient.c'
+    source=path.read_text()
+    selection='if (!WriteToRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;'
+    assert source.count(selection)==1
+    source=source.replace(selection,'if (tAuth[loop] != 33 && !WriteToRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;')
+    # Report only the numeric SecurityResult, without exposing credentials or the
+    # server's private failure strings. Apple does not append standard reasons.
+    auth='    authResult = rfbClientSwap32IfLE(authResult);'
+    assert source.count(auth)==1
+    source=source.replace(auth,auth+"\n    ivncAuthenticationResult(client, authResult);\n    if (client->authScheme == 33) return authResult == rfbVncAuthOK;")
+    signature='rfbBool\nrfbHandleAuthResult('
+    assert signature in source
+    source=source.replace(signature,'extern void ivncAuthenticationResult(rfbClient*, uint32_t);\n\n'+signature,1)
     path.write_text(source)
     marker.write_text(identity)
 print('LibVNCClient '+identity+' prepared in project-local .dev')

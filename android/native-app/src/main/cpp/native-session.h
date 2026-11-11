@@ -21,6 +21,9 @@ struct NativeSession {
     struct Pointer {int x,y,buttons;};
     std::deque<Pointer> input;
     long frames=0;
+    int authenticationResult=-1;
+    bool publicKeyProbed=false;
+    const char* phase="negotiating VNC";
     void emit(const char* kind,const char* value);
     void run(JNIEnv* current,const char* host,int port,jstring user,jstring pass,jobject surface);
     void stop();
