@@ -1,0 +1,2065 @@
+<!DOCTYPE html>
+<html lang="en" class="noVNC_loading">
+<head>
+
+    <!--
+    noVNC-ARD: noVNC with Apple Remote Desktop protocol support
+    Uses upstream noVNC as an untouched submodule; ARD extensions
+    are applied via monkey-patching in ard/ard-patch.js.
+    -->
+    <meta charset="utf-8">
+    <title>noVNC-ARD</title>
+
+    <link rel="icon" type="image/x-icon" href="ard/images/noARD.ico">
+    <meta name="theme-color" content="#313131">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Upstream noVNC stylesheets -->
+    <link rel="stylesheet" href="noVNC/app/styles/constants.css">
+    <link rel="stylesheet" href="noVNC/app/styles/base.css">
+    <link rel="stylesheet" href="noVNC/app/styles/input.css">
+
+    <!-- ARD-specific styles (Layer 2+) -->
+    <link rel="stylesheet" href="ard.css">
+
+    <!-- Images that will later appear via CSS -->
+    <link rel="preload" as="image" href="noVNC/app/images/info.svg">
+    <link rel="preload" as="image" href="noVNC/app/images/error.svg">
+    <link rel="preload" as="image" href="noVNC/app/images/warning.svg">
+
+    <script type="module" crossorigin="anonymous" src="noVNC/app/error-handler.js"></script>
+
+    <script type="module">
+        // Import and apply the ARD patch BEFORE anything creates RFB instances.
+        // The patch modifies RFB.prototype, so all future instances get ARD support.
+        import './ard/ard-patch.js';
+        import './ard/msgport-transport.js';
+
+        import UI from "./noVNC/app/ui.js";
+        import * as Log from './noVNC/core/util/logging.js';
+        import { encodingArdHalftone, encodingArdGray16, encodingArdThousands } from './ard/ard-constants.js';
+        import { displayMenuEntries } from './ard/display-info.js';
+        import { VideoSink } from './ard/hp/video-sink.js';
+        import { MEDIA_SUBPROTOCOL } from './ard/hp/session.js';
+        import { parseDisplayRequest } from './ard/hp/virtual-display.js';
+        import { reconnectDelay } from './ard/reconnect-delay.js';
+
+        let response;
+
+        let defaults = {};
+        let mandatory = {};
+
+        try {
+            response = await fetch('./noVNC/defaults.json');
+            if (!response.ok) {
+                throw Error("" + response.status + " " + response.statusText);
+            }
+
+            defaults = await response.json();
+        } catch (err) {
+            Log.Error("Couldn't fetch defaults.json: " + err);
+        }
+
+        try {
+            response = await fetch('./noVNC/mandatory.json');
+            if (!response.ok) {
+                throw Error("" + response.status + " " + response.statusText);
+            }
+
+            mandatory = await response.json();
+        } catch (err) {
+            Log.Error("Couldn't fetch mandatory.json: " + err);
+        }
+
+        // Default to local scaling
+        if (defaults.resize === undefined) defaults.resize = 'scale';
+
+        // ── ARD sidebar feature toggles ──────────────────────
+        // Set any to false to hide that control from the sidebar.
+        // All overridable via URL params (e.g. ?showArdQuality=false)
+        const _ardUrlParams = new URLSearchParams(window.location.search);
+        function _ardToggle(name, dflt) {
+            const v = _ardUrlParams.get(name);
+            return v === 'false' ? false : v === 'true' ? true : dflt;
+        }
+        const showArdUserAvatar    = _ardToggle('showArdUserAvatar',    true);
+        const showArdClipboard     = _ardToggle('showArdClipboard',     true);
+        const showArdScreenLock    = _ardToggle('showArdScreenLock',    true);
+        const showArdQuality       = _ardToggle('showArdQuality',       true);
+        const showArdDisplaySelect = _ardToggle('showArdDisplaySelect', true);
+        const ardAutoSelectDisplay = _ardToggle('ardAutoSelectDisplay', true);
+        // ── Theme system ──────────────────────────────────
+        // ?theme=novnc (default), ?theme=novnc-ard, ?theme=noard (case-insensitive)
+        const _ardThemes = {
+            'novnc-ard': {
+                title: 'noVNC-ARD',
+                favicon: 'ard/images/noARD.ico',
+                cssVars: {
+                    '--novnc-blue': 'rgb(130, 130, 130)',
+                    '--novnc-darkblue': 'rgb(100, 100, 100)',
+                },
+                cssClass: 'noVNC_theme_ard',
+                toolbarLogo: '<input type="image" alt="noVNC-ARD" src="ard/images/binoculars.svg"'
+                    + ' class="noVNC_button" id="noVNC_ard_logo"'
+                    + ' style="pointer-events:none; opacity:0.8; padding:4px;'
+                    + ' background-color:rgb(145,145,145); border-radius:6px">',
+                connectLogo: '<span>n<i class="noVNC_logo_o">'
+                    + '<img alt="" src="ard/images/binoculars.svg"></i></span>VNC',
+                connectButtonHTML: 'Connect',
+            },
+            'noard': {
+                title: 'noARD',
+                favicon: 'ard/images/noARD.ico',
+                cssVars: {
+                    '--novnc-blue': 'rgb(130, 130, 130)',
+                    '--novnc-darkblue': 'rgb(100, 100, 100)',
+                },
+                cssClass: 'noVNC_theme_ard',
+                toolbarLogo: '<input type="image" alt="noARD" src="ard/images/binoculars.svg"'
+                    + ' class="noVNC_button" id="noVNC_ard_logo"'
+                    + ' style="pointer-events:none; padding:4px;'
+                    + ' background-color:rgb(145,145,145); border-radius:6px">',
+                connectLogo: '<span style="margin-right:5px">n<i class="noVNC_logo_o">'
+                    + '<img alt="" src="ard/images/binoculars.svg"></i></span>'
+                    + '<span style="color:rgb(214,214,214)">ARD</span>',
+                connectButtonHTML: 'Connect',
+            },
+            'novnc': {
+                title: 'noVNC',
+                favicon: 'noVNC/app/images/icons/novnc.ico',
+                cssVars: {},
+                cssClass: 'noVNC_theme_classic',
+                toolbarLogo: '<h1 class="noVNC_logo" translate="no">'
+                    + '<span>no</span><br>VNC</h1>',
+                connectLogo: '<span>no</span>VNC',
+                connectButtonHTML: '<img alt="" src="noVNC/app/images/connect.svg"> Connect',
+            },
+        };
+        const _ardThemeName = (_ardUrlParams.get('theme') || 'novnc').toLowerCase();
+
+        function _ardApplyTheme(theme) {
+            document.documentElement.classList.add(theme.cssClass);
+            for (const [prop, val] of Object.entries(theme.cssVars))
+                document.documentElement.style.setProperty(prop, val);
+            document.title = theme.title;
+            document.querySelector('link[rel="icon"]').href = theme.favicon;
+            document.getElementById('noVNC_toolbar_logo_slot').innerHTML = theme.toolbarLogo;
+            document.getElementById('noVNC_connect_logo').innerHTML = theme.connectLogo;
+            document.getElementById('noVNC_connect_button').innerHTML = theme.connectButtonHTML;
+        }
+
+        _ardApplyTheme(_ardThemes[_ardThemeName] || _ardThemes['novnc']);
+        // ────────────────────────────────────────────────────
+
+        UI.start({ settings: { defaults: defaults,
+                               mandatory: mandatory } });
+
+        // Pre-set ARD encryption dropdown from URL param (?ardEncryption=1|2)
+        const urlParams = new URLSearchParams(window.location.search);
+        const ardEncParam = urlParams.get('ardEncryption');
+        if (ardEncParam === '1' || ardEncParam === '2') {
+            document.getElementById('noVNC_setting_ardEncryption').value = ardEncParam;
+        }
+
+        // Case-insensitive URL param helper
+        function getParamCI(name) {
+            const lower = name.toLowerCase();
+            for (const [k, v] of urlParams) {
+                if (k.toLowerCase() === lower) return v;
+            }
+            return null;
+        }
+
+        // virtualLogin: 0=always share display, 1=show picker (default), 2=always virtual
+        const virtualLoginParam = parseInt(getParamCI('virtualLogin'), 10);
+        const ardVirtualLogin = (virtualLoginParam === 0 || virtualLoginParam === 2)
+            ? virtualLoginParam : 1;
+
+        // ardQuality: halftone, gray, thousands, millions, adaptive (default),
+        // highperf (High Performance: HEVC over a media channel on the relay)
+        const ardQualityParam = getParamCI('ardQuality');
+        const ardInitialQuality = ['halftone', 'gray', 'thousands', 'millions', 'adaptive', 'highperf'].includes(ardQualityParam)
+            ? ardQualityParam : 'adaptive';
+
+        // High Performance needs a browser that decodes the server's HEVC
+        // and a relay with a media endpoint. When it fails, the next
+        // connection is an ordinary 'adaptive' one.
+        const ardMediaPath = (getParamCI('ardMediaPath') || 'media').replace(/^\/+/, '');
+        // ardHpFeedback: which RTCP the viewer sends, for testing what the
+        // server needs. Comma list of rr, ack, rctl; default all.
+        const ardHpFeedbackParam = getParamCI('ardHpFeedback');
+        const ardHpFeedback = ardHpFeedbackParam === null || ardHpFeedbackParam === undefined ? undefined : {
+            reports: ardHpFeedbackParam.split(',').includes('rr'),
+            acks: ardHpFeedbackParam.split(',').includes('ack'),
+            rateControl: ardHpFeedbackParam.split(',').includes('rctl'),
+        };
+        // ardHpVirtualDisplay: false shows the Mac's real displays instead of
+        // a virtual display created for the viewer
+        const ardHpVirtualDisplay = getParamCI('ardHpVirtualDisplay') !== 'false';
+        // ardResolution (also ardHpResolution): the size of the virtual
+        // display to ask for, in a virtual display login of either quality.
+        // In points: 1920x1080 (at 2 pixels to the point), 2560x1440@1
+        // (with the scale), window (this window's size, at 1) or window@2.
+        // Default: nothing asked in Standard; in High Performance the
+        // display Apple's viewer asks for, 1920x1080 at 2.
+        const ardHpResolution = getParamCI('ardResolution') || getParamCI('ardHpResolution');
+        function ardHpDisplay() {
+            if (!ardHpResolution) return null;
+            const box = document.getElementById('noVNC_container');
+            const display = parseDisplayRequest(ardHpResolution, {
+                width: box ? box.clientWidth : window.innerWidth,
+                height: box ? box.clientHeight : window.innerHeight,
+            });
+            if (!display) {
+                Log.Warn('ARD: ardResolution not understood: ' + ardHpResolution);
+                return null;
+            }
+            return display;
+        }
+
+        // ardResolution of the form "window" or "window@2" follows the
+        // browser window: while High Performance is streaming, a resize of
+        // the window asks the Mac for a display of the new size, on the open
+        // connection, without reconnecting.
+        // Resize to window: in High Performance the Mac's display follows the
+        // browser window, sharp at any size. On by default unless the URL
+        // asked for a fixed size; the session dialog turns it on or off.
+        const ardWindowFormUrl = /^window(@[12])?$/i.test(ardHpResolution || '');
+        // Match parseDisplayRequest for an explicit form: window@2 is 2,
+        // window@1 and bare "window" are 1. With no size asked at all, the
+        // dialog's Resize to window defaults to HiDPI (2).
+        const ardWindowScale =
+            /@2$/i.test(ardHpResolution || '') ? 2 :
+            /@1$/i.test(ardHpResolution || '') ? 1 :
+            ardWindowFormUrl ? 1 : 2;
+        let ardResizeToWindow = ardWindowFormUrl || !ardHpResolution;
+
+        function ardWindowDisplay() {
+            const box = document.getElementById('noVNC_container');
+            return parseDisplayRequest('window@' + ardWindowScale, {
+                width: box ? box.clientWidth : window.innerWidth,
+                height: box ? box.clientHeight : window.innerHeight,
+            });
+        }
+        // A web page cannot see the mouse button of an OS window resize: the
+        // drag is on the window frame, not the document, so there is no
+        // release event to wait for. We commit once the size has been still
+        // this long, and sooner if a pointer release does reach the page.
+        const ARD_FOLLOW_DEBOUNCE_MS = 250;   // after the size stops changing
+        const ARD_FOLLOW_MIN_CHANGE = 24;     // points; ignore smaller jitters
+        let ardFollowTimer = null;
+        let ardFollowLast = null;             // { width, height } last asked for
+        let ardFollowBlurred = false;         // the drag softened the picture
+
+        function ardFollowClearBlur() {
+            if (ardFollowBlurred && UI.rfb && UI.rfb._ardHpResizeVisual) {
+                UI.rfb._ardHpResizeVisual(false);
+            }
+            ardFollowBlurred = false;
+        }
+
+        function ardFollowStop() {
+            if (ardFollowTimer) { clearTimeout(ardFollowTimer); ardFollowTimer = null; }
+            ardFollowClearBlur();
+            ardFollowLast = null;
+        }
+
+        // The drag has stopped: ask for the new size, or, if it did not
+        // really change, just take the softening back off.
+        function ardFollowResize() {
+            const rfb = UI.rfb;
+            if (!ardResizeToWindow || !rfb || !rfb.ardHighPerformanceActive) { ardFollowClearBlur(); return; }
+            const display = ardWindowDisplay();
+            if (!display) { ardFollowClearBlur(); return; }
+            if (ardFollowLast &&
+                Math.abs(display.width - ardFollowLast.width) < ARD_FOLLOW_MIN_CHANGE &&
+                Math.abs(display.height - ardFollowLast.height) < ARD_FOLLOW_MIN_CHANGE) {
+                ardFollowClearBlur();
+                return;
+            }
+            if (rfb._ardHpResize(display)) {
+                ardFollowLast = { width: display.width, height: display.height };
+                // The session now owns the softening and clears it when the
+                // new picture arrives.
+                ardFollowBlurred = false;
+            } else {
+                // A re-offer is still in flight: keep the blur and try the
+                // new size again once it settles.
+                if (ardFollowTimer) clearTimeout(ardFollowTimer);
+                ardFollowTimer = setTimeout(() => { ardFollowTimer = null; ardFollowResize(); },
+                                            ARD_FOLLOW_DEBOUNCE_MS);
+            }
+        }
+
+        function ardFollowSchedule() {
+            if (!ardResizeToWindow) return;
+            const rfb = UI.rfb;
+            // Soften the picture as the drag begins; the resize itself waits
+            // until the drag stops (the debounce below).
+            if (rfb && rfb.ardHighPerformanceActive && !ardFollowBlurred && rfb._ardHpResizeVisual) {
+                rfb._ardHpResizeVisual(true);
+                ardFollowBlurred = true;
+            }
+            if (ardFollowTimer) clearTimeout(ardFollowTimer);
+            ardFollowTimer = setTimeout(() => { ardFollowTimer = null; ardFollowResize(); },
+                                        ARD_FOLLOW_DEBOUNCE_MS);
+        }
+
+        if (typeof ResizeObserver !== 'undefined') {
+            const box = document.getElementById('noVNC_container');
+            if (box) new ResizeObserver(() => ardFollowSchedule()).observe(box);
+            window.addEventListener('resize', ardFollowSchedule);
+            // If the release lands in the page, commit the new size at once
+            // instead of waiting out the settle.
+            const commitNow = () => {
+                if (ardFollowBlurred && ardFollowTimer) {
+                    clearTimeout(ardFollowTimer);
+                    ardFollowTimer = null;
+                    ardFollowResize();
+                }
+            };
+            window.addEventListener('pointerup', commitNow, true);
+            window.addEventListener('mouseup', commitNow, true);
+        }
+
+        // ardHpAudio: false leaves the Mac's sound unplayed
+        const ardHpAudio = getParamCI('ardHpAudio') !== 'false';
+        // ardHpShowLocalCursor: High Performance bakes the cursor into the video
+        // on a virtual display. Apple's own viewer also draws the smooth local
+        // cursor on top, so by DEFAULT we show both (the baked video cursor plus
+        // the responsive client cursor). The advanced "Show local cursor"
+        // checkbox — or ?ardHpShowLocalCursor=1/0 — overrides; only an explicit
+        // '0' hides the local cursor. Persisted in localStorage.
+        const ardHpShowLocalCursorParam = getParamCI('ardHpShowLocalCursor');
+        function ardHpShowLocalCursor() {
+            if (ardHpShowLocalCursorParam === '1') return true;
+            if (ardHpShowLocalCursorParam === '0') return false;
+            const el = document.getElementById('noVNC_setting_ardHpShowLocalCursor');
+            if (el) return !!el.checked;
+            // No checkbox yet (early call): default ON unless explicitly stored '0'.
+            try { return localStorage.getItem('ardHpShowLocalCursor') !== '0'; } catch (e) { return true; }
+        }
+        let ardHpSupported = false;
+        let ardHpDisabled = false;
+        // The connection in progress asked for High Performance:
+        // { streamingSince }, null once it has failed or was not asked for
+        let ardHpAttempt = null;
+        const ardHpEarlyMs = 60000;
+        VideoSink.isSupported().then((ok) => {
+            ardHpSupported = ok;
+            if (!ok) Log.Info('ARD: this browser cannot decode High Performance video');
+            // A connection made before the answer was known (autoconnect)
+            if (UI.rfb && UI.rfb._rfbConnectionState === 'connecting') ardApplySessionChoice();
+        });
+
+        function ardHpMediaUrl() {
+            if (UI.getSetting('path') === 'msgport') return null;   // no media channel there yet
+            const host = UI.getSetting('host') || window.location.hostname;
+            const port = UI.getSetting('port') || window.location.port;
+            const scheme = UI.getSetting('encrypt') ? 'wss' : 'ws';
+            return scheme + '://' + host + (port ? ':' + port : '') + '/' + ardMediaPath;
+        }
+
+        // ---------------------------------------------------------------
+        //  Session choice: Share Display, or Virtual Display in High
+        //  Performance or Standard quality
+        // ---------------------------------------------------------------
+        // ardSessionType=share|virtual|highperf forces the choice and skips
+        // the dialog, as does ardQuality=highperf. Otherwise the dialog is
+        // shown when the user clicks Connect or the page first autoconnects,
+        // with the last choice selected.
+        const ardSessionTypeParam = (getParamCI('ardSessionType') || '').toLowerCase();
+        const ardForcedChoice =
+            ardSessionTypeParam === 'share' ? { display: 'share', quality: 'standard' } :
+            ardSessionTypeParam === 'virtual' ? { display: 'virtual', quality: 'standard' } :
+            (ardSessionTypeParam === 'highperf' || ardQualityParam === 'highperf')
+                ? { display: 'virtual', quality: 'highperf' } : null;
+        let ardSessionChoice = ardForcedChoice;     // null: nothing chosen, behave as before
+        let ardAskOnThisConnect = false;            // show the dialog once signed in
+        let ardPendingQuestion = null;              // what the open dialog is answering
+        let ardMediaOk = null;                      // does the relay have a media channel: null = not known
+        let ardMediaBusy = false;                   // is another viewer using it
+        let ardAudioMuted = false;
+        let ardHpInfoTimer = null;
+
+        function ardStoredChoice() {
+            try {
+                const c = JSON.parse(localStorage.getItem('ard_session_choice'));
+                if (c && ['share', 'virtual'].includes(c.display) &&
+                    ['highperf', 'standard'].includes(c.quality)) return c;
+            } catch (e) { /* no storage, or nothing stored */ }
+            return { display: 'share', quality: 'highperf' };
+        }
+
+        // Why High Performance cannot be offered, or null if it can.
+        function ardHpUnusableReason() {
+            if (!ardHpSupported) return 'this browser cannot decode its video';
+            if (ardHpMediaUrl() === null || ardMediaOk === false) {
+                return 'this connection has no media channel';
+            }
+            if (ardMediaBusy) return 'another viewer is using it on this relay';
+            // Known once signed in: the Mac's ServerInit says whether to ask
+            if (UI.rfb && UI.rfb._ardServerInitSeen && !UI.rfb._ardHpOffered()) {
+                return 'this Mac does not offer it';
+            }
+            if (ardHpDisabled) return 'it failed on the last attempt (connect again to retry)';
+            return null;
+        }
+
+        function ardNotice(text, type = 'normal', time = 6000) {
+            UI.showStatus(text, type, time);
+        }
+
+        const ardHpFailureText = {
+            'media-connect': 'the relay has no media channel',
+            'media-closed': 'the media channel closed',
+            'no-message1': 'the Mac did not offer it',
+            'no-encryption': 'the connection was not encrypted in time',
+            'no-answer': 'the Mac did not answer',
+            'no-picture': 'no picture arrived',
+            'decoder': 'the video could not be decoded',
+            'overloaded': 'this computer cannot keep up with it',
+            'media-stopped': 'the Mac stopped sending it',
+            'unsupported-video': 'the Mac sent video this viewer does not read',
+            'stalled': 'part of the picture was lost',
+            'bad-message1': 'the Mac sent something unexpected',
+            'bad-answer': 'the Mac sent something unexpected',
+        };
+
+        // Put the current choice into effect on the connection being made.
+        function ardApplySessionChoice() {
+            const rfb = UI.rfb;
+            if (!rfb) return;
+            const choice = ardSessionChoice;
+            const wantHp = !!choice && choice.display === 'virtual' && choice.quality === 'highperf';
+            const hp = wantHp && ardHpUnusableReason() === null;
+            // The same choice answers the Mac's own question about which
+            // session to open, unless the URL decides that. Not while the
+            // dialog is still to come: an earlier choice must not answer
+            // for the one about to be made.
+            rfb._ardVirtualLogin = (choice && !ardAskOnThisConnect && isNaN(virtualLoginParam))
+                ? (choice.display === 'virtual' ? 2 : 0) : ardVirtualLogin;
+            rfb._ardQualityPreset = hp ? 'highperf'
+                : (ardInitialQuality === 'highperf' ? 'adaptive' : ardInitialQuality);
+            rfb._ardHpAllowed = hp;
+            if (!hp) ardHpAttempt = null;
+            else if (!ardHpAttempt) ardHpAttempt = { streamingSince: null };
+            rfb._ardHpMediaUrl = hp ? ardHpMediaUrl() : null;
+            rfb._ardHpFeedback = ardHpFeedback;
+            rfb._ardHpVirtualDisplay = ardHpVirtualDisplay;
+            // In High Performance with resize-to-window, the display is the
+            // browser window (and follows it); otherwise the URL size, if any.
+            rfb._ardHpDisplay = (hp && ardResizeToWindow) ? ardWindowDisplay() : ardHpDisplay();
+            rfb._ardHpAudio = ardHpAudio;
+            rfb._ardHpShowLocalCursor = ardHpShowLocalCursor();
+            rfb.ardAudioMuted = ardAudioMuted;
+            // Virtual Display in Standard quality is the ordinary virtual
+            // login: nothing more is asked of the Mac.
+            return { wantHp, hp };
+        }
+
+        function ardOnHpState(e) {
+            const d = e.detail;
+            if (d.state === 'streaming') {
+                const v = d.video;
+                ardNotice('High Performance' + (v ? ' · ' + v.width + '×' + v.height : ''), 'normal', 3000);
+                // The size now on screen is the baseline the follower measures from.
+                if (ardResizeToWindow) {
+                    const display = ardWindowDisplay();
+                    ardFollowLast = display ? { width: display.width, height: display.height } : null;
+                }
+                if (ardHpAttempt) ardHpAttempt.streamingSince = performance.now();
+                ardShowAudioButton(ardHpAudio);
+                ardStartHpInfo();
+            } else if (d.state === 'failed') {
+                const why = ardHpFailureText[d.reason] || d.reason;
+                Log.Warn('ARD: High Performance failed (' + d.failure + ')');
+                ardNotice('High Performance stopped: ' + why + '. Using Standard.', 'warn', 8000);
+                ardHpDisabled = true;
+                ardHpAttempt = null;
+                ardHpUiReset();
+                // The Mac never started the negotiation: the session is an
+                // ordinary one and carries on. Otherwise start again without.
+                if (d.reason !== 'no-message1' && UI.rfb) {
+                    UI.rfb.disconnect();
+                }
+            } else if (d.state === 'closed') {
+                ardHpUiReset();
+                ardFollowStop();
+            }
+        }
+
+        function ardShowAudioButton(show) {
+            const btn = document.getElementById('noVNC_audio_button');
+            btn.classList.toggle('noVNC_hidden', !show);
+            btn.classList.toggle('noVNC_muted', ardAudioMuted);
+            btn.title = ardAudioMuted ? "Unmute the Mac's sound" : "Mute the Mac's sound";
+        }
+
+        function ardHpUiReset() {
+            ardShowAudioButton(false);
+            if (ardHpInfoTimer) {
+                clearInterval(ardHpInfoTimer);
+                ardHpInfoTimer = null;
+            }
+            for (const id of ['ard_info_video_row', 'ard_info_audio_row']) {
+                document.getElementById(id).classList.add('noVNC_hidden');
+            }
+        }
+
+        // Once a second while High Performance runs: what is arriving.
+        function ardStartHpInfo() {
+            let last = null;
+            const update = () => {
+                const s = UI.rfb && UI.rfb._ardHp;
+                if (!s || !s.video) return;
+                const now = performance.now();
+                let rate = '';
+                let akbit = '';
+                if (last) {
+                    const dt = (now - last.at) / 1000;
+                    const mbit = Math.max(0, (s.stats.videoBytes - last.bytes)) * 8 / 1e6 / dt;
+                    const pics = Math.max(0, (s.stats.pictures - last.pictures)) / dt;
+                    rate = ' · ' + mbit.toFixed(1) + ' Mbit/s · ' + Math.round(pics) + ' pictures/s';
+                    const akb = Math.max(0, (s.stats.audioBytes - last.audioBytes)) * 8 / 1e3 / dt;
+                    akbit = ' · ' + Math.round(akb) + ' kbit/s';
+                }
+                last = { at: now, bytes: s.stats.videoBytes, pictures: s.stats.pictures,
+                         audioBytes: s.stats.audioBytes };
+                document.getElementById('ard_info_video').textContent =
+                    'HEVC ' + s.video.width + '×' + s.video.height + rate;
+                document.getElementById('ard_info_audio').textContent =
+                    !ardHpAudio ? 'Off' : !s.audioReady ? 'Not available' :
+                    (ardAudioMuted ? 'Muted' : 'On') + akbit;
+            };
+            for (const id of ['ard_info_video_row', 'ard_info_audio_row']) {
+                document.getElementById(id).classList.remove('noVNC_hidden');
+            }
+            if (ardHpInfoTimer) clearInterval(ardHpInfoTimer);
+            ardHpInfoTimer = setInterval(update, 1000);
+            update();
+        }
+
+        // ----- the dialog, shown once signed in -----
+
+        // Is there a relay with a media endpoint behind this connection,
+        // and is it free? A plain TCP proxy accepts the WebSocket but not
+        // the subprotocol. The relay has one media channel, which goes to
+        // whoever connects to it last, so this only asks (?probe): the
+        // relay answers in its close reason and attaches nothing.
+        function ardProbeMedia() {
+            const url = ardHpMediaUrl();
+            ardMediaOk = null;
+            ardMediaBusy = false;
+            if (url === null) {
+                ardMediaOk = false;
+                return Promise.resolve(false);
+            }
+            return new Promise((resolve) => {
+                let ws, opened = false, done = false;
+                const finish = (ok, busy = false) => {
+                    if (done) return;
+                    done = true;
+                    ardMediaOk = ok;
+                    ardMediaBusy = ok && busy;
+                    try { ws.close(); } catch (e) { /* never opened */ }
+                    resolve(ok);
+                };
+                try {
+                    ws = new WebSocket(url + '?probe', MEDIA_SUBPROTOCOL);
+                } catch (e) {
+                    finish(false);
+                    return;
+                }
+                ws.onopen = () => {
+                    if (ws.protocol !== MEDIA_SUBPROTOCOL) {
+                        finish(false);
+                        return;
+                    }
+                    opened = true;
+                    // A relay that does not know the question keeps the
+                    // socket open: it has the endpoint, more is not known.
+                    setTimeout(() => finish(true), 1000);
+                };
+                ws.onerror = () => finish(false);
+                ws.onclose = e => finish(opened, e.reason === 'busy');
+                setTimeout(() => finish(false), 3000);
+            });
+        }
+
+        function ardSyncTypeDialog() {
+            const dlg = document.getElementById('noVNC_ard_type_dlg');
+            const virtual = dlg.querySelector('input[name="ard_display"][value="virtual"]').checked;
+            const hpInput = dlg.querySelector('input[name="ard_quality"][value="highperf"]');
+            const stdInput = dlg.querySelector('input[name="ard_quality"][value="standard"]');
+            const checking = ardHpSupported && ardMediaOk === null;
+            const reason = checking ? 'checking the connection' : ardHpUnusableReason();
+            document.getElementById('noVNC_ard_type_quality').classList.toggle('noVNC_ard_type_off', !virtual);
+            stdInput.disabled = !virtual;
+            hpInput.disabled = !virtual || reason !== null;
+            // What was wanted comes back if the check turns out well.
+            if (reason === null && dlg.dataset.wantHp === 'true') hpInput.checked = true;
+            else if (reason !== null && hpInput.checked) stdInput.checked = true;
+            hpInput.closest('label').classList.toggle('noVNC_ard_type_off', reason !== null);
+            document.getElementById('noVNC_ard_type_hp_note').textContent = reason === null
+                ? 'Sharpest, with sound. Needs a fast network'
+                : checking ? 'Checking the connection…' : 'Not available: ' + reason;
+            // Resize to window applies to High Performance only.
+            const hpChosen = virtual && hpInput.checked && reason === null;
+            const resizeRow = document.getElementById('noVNC_ard_type_resize_row');
+            const resizeInput = document.getElementById('noVNC_ard_type_resize');
+            resizeRow.classList.toggle('noVNC_ard_type_off', !hpChosen);
+            resizeInput.disabled = !hpChosen;
+            resizeInput.checked = ardResizeToWindow;
+        }
+
+        // The connection is waiting for an answer. ctx.mode says to what:
+        // 'select' — the Mac asks, because someone else is using its display
+        // 'choice' — our own pause after sign-in
+        function ardOnSessionQuestion(ctx) {
+            // Nothing to ask on a reconnect or when the URL has decided,
+            // unless someone is using the Mac's display and nobody has
+            // said yet what to do about that.
+            if (!ardAskOnThisConnect &&
+                (ctx.mode === 'choice' || ardSessionChoice || !ctx.username)) {
+                ardAnswerSession(ctx);
+                return;
+            }
+            ardOpenTypeDialog(ctx);
+        }
+
+        function ardAnswerSession(ctx) {
+            if (!UI.rfb) return;
+            const applied = ardApplySessionChoice();
+            if (applied.wantHp && !applied.hp) {
+                ardNotice('High Performance is not available: ' +
+                          ardHpUnusableReason() + '. Using Standard.', 'warn');
+            }
+            if (ctx.mode === 'select') {
+                const virtual = ardSessionChoice && ardSessionChoice.display === 'virtual';
+                UI.rfb.selectSessionType(virtual ? 2 : 1);
+            } else {
+                UI.rfb.ardContinueSession();
+            }
+        }
+
+        function ardOpenTypeDialog(ctx) {
+            const dlg = document.getElementById('noVNC_ard_type_dlg');
+            const c = ardSessionChoice || ardStoredChoice();
+            ardPendingQuestion = ctx;
+
+            const infoEl = dlg.querySelector('.noVNC_session_info');
+            document.getElementById('noVNC_ard_session_hostname').textContent = ' ' + (UI.desktopName || '');
+            if (ctx.mode === 'select' && ctx.username) {
+                document.getElementById('noVNC_ard_session_username').textContent = ctx.username + ' ';
+                infoEl.style.display = '';
+            } else {
+                infoEl.style.display = 'none';
+            }
+            const authEl = dlg.querySelector('.noVNC_session_auth');
+            if (ardReconnectCredentials && ardReconnectCredentials.username) {
+                document.getElementById('noVNC_ard_session_authuser').textContent =
+                    ' ' + ardReconnectCredentials.username;
+                authEl.style.display = '';
+            } else {
+                authEl.style.display = 'none';
+            }
+
+            dlg.querySelector('input[name="ard_display"][value="' + c.display + '"]').checked = true;
+            dlg.querySelector('input[name="ard_quality"][value="' + c.quality + '"]').checked = true;
+            dlg.dataset.wantHp = String(c.quality === 'highperf');
+            ardHpDisabled = false;      // asking again gives it another chance
+            ardProbeMedia().then(() => {
+                if (ardPendingQuestion === ctx) ardSyncTypeDialog();
+            });
+            ardSyncTypeDialog();
+            dlg.classList.add('noVNC_open');
+            document.getElementById('noVNC_ard_type_continue').focus();
+        }
+
+        function ardCloseTypeDialog() {
+            document.getElementById('noVNC_ard_type_dlg').classList.remove('noVNC_open');
+            ardPendingQuestion = null;
+        }
+
+        document.getElementById('noVNC_ard_type_dlg').addEventListener('change', (e) => {
+            const dlg = document.getElementById('noVNC_ard_type_dlg');
+            if (e.target.name === 'ard_quality') dlg.dataset.wantHp = String(e.target.value === 'highperf');
+            if (e.target.id === 'noVNC_ard_type_resize') ardResizeToWindow = e.target.checked;
+            ardSyncTypeDialog();
+        });
+        // While the dialog is open, Enter means Continue and Escape means
+        // Disconnect, wherever the focus is (it need not be in the dialog).
+        document.addEventListener('keydown', (e) => {
+            const dlg = document.getElementById('noVNC_ard_type_dlg');
+            if (!dlg.classList.contains('noVNC_open')) return;
+            if (e.key === 'Enter') {
+                // Let a focused button activate itself (e.g. Disconnect); only
+                // default to Continue when focus is not on a button.
+                const a = document.activeElement;
+                if (a && a.tagName === 'BUTTON') return;
+                e.preventDefault();
+                document.getElementById('noVNC_ard_type_continue').click();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                document.getElementById('noVNC_ard_type_cancel').click();
+            }
+        });
+        for (const id of ['noVNC_ard_type_cancel', 'noVNC_ard_type_disconnect']) {
+            document.getElementById(id).addEventListener('click', (e) => {
+                e.preventDefault();
+                ardCloseTypeDialog();
+                UI.disconnect();
+            });
+        }
+        document.getElementById('noVNC_ard_type_continue').addEventListener('click', () => {
+            const dlg = document.getElementById('noVNC_ard_type_dlg');
+            const ctx = ardPendingQuestion;
+            ardSessionChoice = {
+                display: dlg.querySelector('input[name="ard_display"]:checked').value,
+                quality: dlg.querySelector('input[name="ard_quality"]:checked').value,
+            };
+            ardResizeToWindow = document.getElementById('noVNC_ard_type_resize').checked;
+            try {
+                localStorage.setItem('ard_session_choice', JSON.stringify({
+                    display: ardSessionChoice.display,
+                    // Remember High Performance as the wish even when this
+                    // connection could not offer it.
+                    quality: dlg.dataset.wantHp === 'true' ? 'highperf' : ardSessionChoice.quality,
+                }));
+            } catch (e) { /* not remembered, then */ }
+            ardCloseTypeDialog();
+            ardAskOnThisConnect = false;    // reconnects of this session do not ask
+            if (ctx) ardAnswerSession(ctx);
+        });
+        document.getElementById('noVNC_audio_button').addEventListener('click', () => {
+            ardAudioMuted = !ardAudioMuted;
+            if (UI.rfb) UI.rfb.ardAudioMuted = ardAudioMuted;
+            ardShowAudioButton(true);
+        });
+
+        // ardControlMode: 0=observe, 1=shared control (default), 2=exclusive
+        const ardControlModeParam = parseInt(getParamCI('ardControlMode'), 10);
+        const ardInitialControlMode = [0, 1, 2].includes(ardControlModeParam) ? ardControlModeParam : 1;
+
+        // ARD info panel toggle — use noVNC's class-based panel system
+        const ardInfoBtn = document.getElementById('ard_info_button');
+        const ardInfoPanel = document.getElementById('ard_info_panel');
+        if (ardInfoBtn && ardInfoPanel) {
+            ardInfoBtn.addEventListener('click', () => {
+                if (ardInfoPanel.classList.contains('noVNC_open')) {
+                    ardInfoPanel.classList.remove('noVNC_open');
+                    ardInfoBtn.classList.remove('noVNC_selected');
+                } else {
+                    ardInfoPanel.classList.add('noVNC_open');
+                    ardInfoBtn.classList.add('noVNC_selected');
+                }
+            });
+        }
+
+        // =============================================================
+        //  ARD Session Select UI
+        // =============================================================
+
+
+        // =============================================================
+        //  ARD Clipboard Buttons
+        // =============================================================
+
+        let ardClipboardSyncEnabled = true; // matches init default (AutoPasteboard ON)
+
+        function ardUpdateClipboardButtons(connected) {
+            const isARD = connected && UI.rfb && UI.rfb._rfbAppleARD;
+            const showClip = isARD && showArdClipboard;
+            const syncBtn = document.getElementById('noVNC_clipboard_sync_button');
+            const sendBtn = document.getElementById('noVNC_clipboard_send_button');
+            const getBtn  = document.getElementById('noVNC_clipboard_get_button');
+
+            // Show ARD buttons, hide legacy clipboard panel button
+            syncBtn.classList.toggle('noVNC_hidden', !showClip);
+            sendBtn.classList.toggle('noVNC_hidden', !showClip);
+            getBtn.classList.toggle('noVNC_hidden', !showClip);
+            document.getElementById('noVNC_clipboard_button')
+                .classList.toggle('noVNC_hidden', !!isARD);
+
+            syncBtn.disabled = !isARD;
+            if (isARD) {
+                syncBtn.classList.toggle('noVNC_selected', ardClipboardSyncEnabled);
+            }
+            const sendGetEnabled = isARD && !ardClipboardSyncEnabled;
+            sendBtn.disabled = !sendGetEnabled;
+            getBtn.disabled = !sendGetEnabled;
+            if (!connected) {
+                ardClipboardSyncEnabled = true;
+                syncBtn.classList.remove('noVNC_selected');
+            }
+        }
+
+        function ardToggleClipboardSync() {
+            ardClipboardSyncEnabled = !ardClipboardSyncEnabled;
+            const syncActive = ardClipboardSyncEnabled;
+            const btn = document.getElementById('noVNC_clipboard_sync_button');
+            btn.classList.toggle('noVNC_selected', syncActive);
+            btn.title = syncActive ? 'Disable clipboard auto-sync' : 'Enable clipboard auto-sync';
+            document.getElementById('noVNC_clipboard_send_button').disabled = syncActive;
+            document.getElementById('noVNC_clipboard_get_button').disabled = syncActive;
+            if (UI.rfb) UI.rfb.enableClipboardSync(syncActive);
+        }
+
+        // Clipboard button event handlers
+        document.getElementById('noVNC_clipboard_send_button')
+            .addEventListener('click', async () => {
+                if (!UI.rfb) return;
+                let text;
+                try {
+                    text = await navigator.clipboard.readText();
+                } catch (e) {
+                    // Clipboard API unavailable — fall back to textarea
+                    text = document.getElementById('noVNC_clipboard_text').value;
+                }
+                UI.rfb.forceClipboardPaste(text);
+            });
+        document.getElementById('noVNC_clipboard_get_button')
+            .addEventListener('click', () => {
+                if (UI.rfb) UI.rfb.requestRemoteClipboard();
+            });
+        document.getElementById('noVNC_clipboard_sync_button')
+            .addEventListener('click', ardToggleClipboardSync);
+
+        // =============================================================
+        //  ARD Remote User Avatar
+        // =============================================================
+
+        function ardShowAvatar(src, title) {
+            const div = document.getElementById('noVNC_ard_user_avatar');
+            const img = document.getElementById('noVNC_ard_user_avatar_img');
+            img.src = src;
+            div.title = title;
+            div.classList.remove('noVNC_hidden');
+        }
+
+        function ardHideAvatar() {
+            const div = document.getElementById('noVNC_ard_user_avatar');
+            const img = document.getElementById('noVNC_ard_user_avatar_img');
+            div.classList.add('noVNC_hidden');
+            img.removeAttribute('src');
+            div.title = '';
+        }
+
+        function ardHandleUserInfo() {
+            if (!showArdUserAvatar || !UI.rfb) {
+                ardHideAvatar();
+                return;
+            }
+
+            const username = UI.rfb._ardRemoteUser || '';
+            const useGenericIcon = !username ||
+                username.toLowerCase() === 'system administrator';
+
+            if (useGenericIcon) {
+                ardShowAvatar('ard/images/user.svg', username || 'Login window');
+                return;
+            }
+
+            if (UI.rfb._ardUserAvatarPng) {
+                const data = UI.rfb._ardUserAvatarPng;
+
+                // Check PNG signature: 89 50 4E 47
+                const isPNG = data.length > 8 &&
+                    data[0] === 0x89 && data[1] === 0x50 &&
+                    data[2] === 0x4E && data[3] === 0x47;
+
+                if (isPNG) {
+                    // ARD sends PNG with BGRA channel order — decode to canvas,
+                    // swap R↔B, then export as corrected PNG for display.
+                    const blob = new Blob([data], { type: 'image/png' });
+                    const url = URL.createObjectURL(blob);
+                    const tmpImg = new Image();
+                    tmpImg.onload = function () {
+                        URL.revokeObjectURL(url);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = tmpImg.width;
+                        canvas.height = tmpImg.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(tmpImg, 0, 0);
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const px = imgData.data;
+                        for (let i = 0; i < px.length; i += 4) {
+                            const tmp = px[i];
+                            px[i] = px[i + 2];
+                            px[i + 2] = tmp;
+                        }
+                        ctx.putImageData(imgData, 0, 0);
+                        ardShowAvatar(canvas.toDataURL('image/png'),
+                            username + ' is signed in');
+                    };
+                    tmpImg.onerror = function () {
+                        URL.revokeObjectURL(url);
+                        ardShowAvatar('ard/images/user.svg', username + ' is signed in');
+                    };
+                    tmpImg.src = url;
+                } else {
+                    // Raw pixel data — BGRA (alpha=0xFF) or RGBA
+                    const isBGRA = data[3] === 0xFF;
+                    const size = Math.sqrt(data.length / 4);
+                    if (size % 1 === 0) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size;
+                        canvas.height = size;
+                        const ctx = canvas.getContext('2d', { alpha: false });
+                        const imageData = ctx.createImageData(size, size);
+                        for (let i = 0; i < data.length; i += 4) {
+                            imageData.data[i]     = data[i + (isBGRA ? 2 : 0)];
+                            imageData.data[i + 1] = data[i + 1];
+                            imageData.data[i + 2] = data[i + (isBGRA ? 0 : 2)];
+                            imageData.data[i + 3] = 255;
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                        ardShowAvatar(canvas.toDataURL('image/png'),
+                            username + ' is signed in');
+                    } else {
+                        ardShowAvatar('ard/images/user.svg', username + ' is signed in');
+                    }
+                }
+            } else {
+                // Real user but no avatar data — show generic icon
+                ardShowAvatar('ard/images/user.svg', username + ' is signed in');
+            }
+        }
+
+        // =============================================================
+        //  ARD Auto-Reconnect State
+        // =============================================================
+
+        let ardReconnectAttempt = 0;
+        const ardReconnectMaxAttempts = 10;
+        let ardReconnectCallback = null;
+        let ardReconnectCredentials = null; // { username, password }
+        let ardLastDisconnectTime = 0;
+        let ardInhibitReconnect = true;
+
+        // =============================================================
+        //  Wrap UI.setCredentials — capture username+password for reconnect
+        // =============================================================
+
+        const _origSetCredentials = UI.setCredentials;
+        UI.setCredentials = function (e) {
+            const username = document.getElementById('noVNC_username_input').value;
+            const password = document.getElementById('noVNC_password_input').value;
+            if (username || password) {
+                ardReconnectCredentials = { username, password };
+            }
+            _origSetCredentials.call(UI, e);
+        };
+
+        // =============================================================
+        //  Wrap UI.credentials — auto-submit cached credentials on reconnect
+        // =============================================================
+
+        const _origCredentials = UI.credentials;
+        UI.credentials = function (e) {
+            if (ardReconnectAttempt > 0 && ardReconnectCredentials) {
+                UI.rfb.sendCredentials(ardReconnectCredentials);
+                return;
+            }
+            _origCredentials.call(UI, e);
+        };
+
+        // =============================================================
+        //  ARD Control Mode UI
+        // =============================================================
+
+        function ardSetControlModeUI(mode) {
+            document.getElementById('noVNC_setting_shared').checked = (mode === 1);
+            document.getElementById('noVNC_setting_view_only').checked = (mode === 0);
+            document.getElementById('noVNC_setting_exclusive_control').checked = (mode === 2);
+            if (UI.rfb && UI.rfb._rfbAppleARD) {
+                UI.rfb.ardControlMode = mode;
+                UI.rfb.viewOnly = (mode === 0);
+            }
+            // Hide keyboard + extra keys buttons in Observe mode
+            document.getElementById('noVNC_keyboard_button')
+                .classList.toggle('noVNC_hidden', mode === 0);
+            document.getElementById('noVNC_toggle_extra_keys_button')
+                .classList.toggle('noVNC_hidden', mode === 0);
+        }
+
+        function ardUpdateControlSettings() {
+            if (UI.rfb && UI.rfb._rfbAppleARD) {
+                document.getElementById('noVNC_ard_exclusive_row')
+                    .classList.remove('noVNC_hidden');
+                // Re-enable shared checkbox (upstream disables it on connect)
+                document.getElementById('noVNC_setting_shared').disabled = false;
+                ardSetControlModeUI(ardInitialControlMode);
+            }
+        }
+
+        // Exclusive control checkbox
+        document.getElementById('noVNC_setting_exclusive_control')
+            .addEventListener('change', () => {
+                if (!UI.rfb || !UI.rfb._rfbAppleARD) return;
+                const checked = document.getElementById('noVNC_setting_exclusive_control').checked;
+                ardSetControlModeUI(checked ? 2 : 1);
+            });
+
+        // Wrap upstream View Only handler — intercept for ARD control modes
+        const _origUpdateViewOnly = UI.updateViewOnly;
+        UI.updateViewOnly = function () {
+            if (UI.rfb && UI.rfb._rfbAppleARD) {
+                const viewOnly = document.getElementById('noVNC_setting_view_only').checked;
+                ardSetControlModeUI(viewOnly ? 0 : 1);
+                return;
+            }
+            _origUpdateViewOnly.call(UI);
+        };
+
+        // Shared mode checkbox — when checked, switch to mode 1
+        document.getElementById('noVNC_setting_shared')
+            .addEventListener('change', () => {
+                if (!UI.rfb || !UI.rfb._rfbAppleARD) return;
+                const checked = document.getElementById('noVNC_setting_shared').checked;
+                if (checked) {
+                    ardSetControlModeUI(1);
+                }
+            });
+
+        // Show local cursor (High Performance): shown by default (both the
+        // baked video cursor and the local one, like Apple). Persist the choice
+        // and apply it to a live session on toggle.
+        (function () {
+            const el = document.getElementById('noVNC_setting_ardHpShowLocalCursor');
+            if (!el) return;
+            try {
+                if (ardHpShowLocalCursorParam === '1' || ardHpShowLocalCursorParam === '0') {
+                    el.checked = ardHpShowLocalCursorParam === '1';
+                } else {
+                    // Default ON — only an explicit stored '0' turns it off.
+                    el.checked = localStorage.getItem('ardHpShowLocalCursor') !== '0';
+                }
+            } catch (e) { el.checked = true; /* storage blocked — default ON */ }
+            el.addEventListener('change', () => {
+                try {
+                    localStorage.setItem('ardHpShowLocalCursor', el.checked ? '1' : '0');
+                } catch (e) { /* ignore */ }
+                if (UI.rfb) UI.rfb._ardHpShowLocalCursor = el.checked;
+            });
+        })();
+
+        // Display selector — button toggles panel, entries switch display
+        function ardCloseDisplayPanel() {
+            document.getElementById('noVNC_display_panel').classList.remove('noVNC_open');
+            document.getElementById('noVNC_display_button').classList.remove('noVNC_selected');
+        }
+
+        // Rebuild the menu from the server's display list. The button only
+        // shows when there is more than one display to choose from.
+        function ardUpdateDisplayMenu() {
+            const rfb = UI.rfb;
+            const entries = (showArdDisplaySelect && rfb && rfb._rfbAppleARD)
+                ? displayMenuEntries(rfb._ardDisplays) : [];
+            document.getElementById('noVNC_display_button')
+                .classList.toggle('noVNC_hidden', entries.length === 0);
+            if (entries.length === 0) {
+                ardCloseDisplayPanel();
+            }
+            document.getElementById('noVNC_display_list').replaceChildren(
+                ...entries.map((entry) => {
+                    const option = document.createElement('button');
+                    option.type = 'button';
+                    option.className = 'noVNC_display_option';
+                    option.classList.toggle('noVNC_selected',
+                                            entry.id === rfb.ardSelectedDisplay);
+                    option.textContent = entry.label;
+                    option.addEventListener('click', () => {
+                        if (!UI.rfb) return;
+                        UI.rfb.ardSelectedDisplay = entry.id;
+                        ardUpdateDisplayMenu();
+                        ardCloseDisplayPanel();
+                        UI.rfb.focus();
+                    });
+                    return option;
+                }));
+        }
+
+        document.getElementById('noVNC_display_button')
+            .addEventListener('click', () => {
+                const panel = document.getElementById('noVNC_display_panel');
+                if (panel.classList.contains('noVNC_open')) {
+                    ardCloseDisplayPanel();
+                } else {
+                    panel.classList.add('noVNC_open');
+                    document.getElementById('noVNC_display_button')
+                        .classList.add('noVNC_selected');
+                }
+            });
+
+        // Quality selector — button toggles panel, track handles drag
+        document.getElementById('noVNC_quality_button')
+            .addEventListener('click', () => {
+                const panel = document.getElementById('noVNC_quality_panel');
+                const btn = document.getElementById('noVNC_quality_button');
+                if (panel.classList.contains('noVNC_open')) {
+                    panel.classList.remove('noVNC_open');
+                    btn.classList.remove('noVNC_selected');
+                } else {
+                    panel.classList.add('noVNC_open');
+                    btn.classList.add('noVNC_selected');
+                    ardSyncQualityStops();
+                }
+            });
+
+        function ardSyncQualityStops() {
+            const preset = (UI.rfb && UI.rfb._rfbAppleARD)
+                ? UI.rfb.ardQualityPreset : ardInitialQuality;
+            ardShowQualityPreview(preset);
+        }
+
+        function ardShowQualityPreview(preset) {
+            document.querySelectorAll('.noVNC_quality_stop')
+                .forEach((s) => {
+                    s.classList.toggle('noVNC_active',
+                                       s.dataset.preset === preset);
+                });
+        }
+
+        function ardQualityFromY(track, clientY) {
+            const rect = track.getBoundingClientRect();
+            const ratio = (clientY - rect.top) / rect.height;
+            const clamped = Math.max(0, Math.min(1, ratio));
+            const presets = ['adaptive', 'millions', 'thousands', 'gray', 'halftone'];
+            const idx = Math.min(presets.length - 1,
+                                  Math.floor(clamped * presets.length));
+            return presets[idx];
+        }
+
+        // Label the stop under the pointer while hovering or dragging
+        function ardShowQualityHint(preset) {
+            document.querySelectorAll('.noVNC_quality_stop')
+                .forEach((s) => {
+                    s.classList.toggle('noVNC_hint',
+                                       s.dataset.preset === preset);
+                });
+        }
+        ['pointerdown', 'pointermove'].forEach((type) => {
+            document.getElementById('noVNC_quality_track')
+                .addEventListener(type, (e) => {
+                    ardShowQualityHint(ardQualityFromY(e.currentTarget, e.clientY));
+                });
+        });
+        document.getElementById('noVNC_quality_track')
+            .addEventListener('pointerleave', () => ardShowQualityHint(null));
+
+        document.getElementById('noVNC_quality_track')
+            .addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const track = document.getElementById('noVNC_quality_track');
+                track.setPointerCapture(e.pointerId);
+
+                let pending = ardQualityFromY(track, e.clientY);
+                ardShowQualityPreview(pending);
+
+                const onMove = (ev) => {
+                    ev.preventDefault();
+                    pending = ardQualityFromY(track, ev.clientY);
+                    ardShowQualityPreview(pending);
+                };
+                const onUp = (ev) => {
+                    pending = ardQualityFromY(track, ev.clientY);
+                    if (UI.rfb && UI.rfb._rfbAppleARD) {
+                        UI.rfb.ardQualityPreset = pending;
+                    }
+                    ardSyncQualityStops();
+                    track.releasePointerCapture(ev.pointerId);
+                    track.removeEventListener('pointermove', onMove);
+                    track.removeEventListener('pointerup', onUp);
+                    track.removeEventListener('lostpointercapture', onUp);
+                };
+
+                track.addEventListener('pointermove', onMove);
+                track.addEventListener('pointerup', onUp);
+                track.addEventListener('lostpointercapture', onUp);
+            });
+
+        // =============================================================
+        //  Double-backtick → full framebuffer refresh
+        // =============================================================
+        // First tap passes through normally; second tap within 300 ms
+        // is intercepted (not forwarded to the remote) and fires
+        // requestFullUpdate.
+
+        let lastBacktickMs = 0;
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== '`') return;
+            const now = Date.now();
+            const elapsed = now - lastBacktickMs;
+            lastBacktickMs = now;
+            if (elapsed < 300 && UI.rfb) {
+                e.stopPropagation();
+                e.preventDefault();
+                lastBacktickMs = 0; // reset so triple-tap doesn't re-fire
+                UI.rfb.requestFullUpdate();
+            }
+        }, true); // capture phase — fires before rfb canvas handler
+
+        // =============================================================
+        //  ARD Curtain (screen lock)
+        // =============================================================
+
+        let ardCurtainMessage = ''; // persists across lock/unlock cycles
+
+        document.getElementById('noVNC_curtain_button')
+            .addEventListener('click', () => {
+                if (!UI.rfb) return;
+                if (UI.rfb.ardCurtainActive) {
+                    UI.rfb.ardCurtainUnlock();
+                } else {
+                    ardToggleCurtainPanel();
+                }
+            });
+
+        document.getElementById('noVNC_curtain_lock_button')
+            .addEventListener('click', ardEngageCurtain);
+
+        document.getElementById('noVNC_curtain_message')
+            .addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); ardEngageCurtain(); }
+                if (e.key === 'Escape') { ardCloseCurtainPanel(); }
+            });
+
+        function ardOpenCurtainPanel() {
+            const input = document.getElementById('noVNC_curtain_message');
+            input.value = ardCurtainMessage;
+            document.getElementById('noVNC_curtain_panel').classList.add('noVNC_open');
+            document.getElementById('noVNC_curtain_button').classList.add('noVNC_selected');
+        }
+
+        function ardCloseCurtainPanel() {
+            document.getElementById('noVNC_curtain_panel').classList.remove('noVNC_open');
+            document.getElementById('noVNC_curtain_button').classList.remove('noVNC_selected');
+        }
+
+        function ardToggleCurtainPanel() {
+            if (document.getElementById('noVNC_curtain_panel')
+                    .classList.contains('noVNC_open')) {
+                ardCloseCurtainPanel();
+            } else {
+                ardOpenCurtainPanel();
+            }
+        }
+
+        function ardEngageCurtain() {
+            if (!UI.rfb) return;
+            const input = document.getElementById('noVNC_curtain_message');
+            const typed = input.value.trim();
+            if (typed) ardCurtainMessage = typed;
+            ardCloseCurtainPanel();
+            UI.rfb.ardCurtainLock(ardCurtainMessage || undefined);
+        }
+
+        function ardUpdateCurtainButton() {
+            const isARD = !!(UI.rfb && UI.rfb._rfbAppleARD);
+            const btn = document.getElementById('noVNC_curtain_button');
+            btn.classList.toggle('noVNC_hidden', !isARD || !showArdScreenLock);
+            if (!isARD || !showArdScreenLock) {
+                btn.disabled = true;
+                ardCloseCurtainPanel();
+                return;
+            }
+            btn.disabled = false;
+            const active = UI.rfb && UI.rfb.ardCurtainActive;
+            const svgOpen = '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>';
+            const svgLock = '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
+            btn.querySelector('svg').innerHTML = active ? svgLock : svgOpen;
+            btn.classList.toggle('noVNC_selected', !!active);
+            btn.title = active ? 'Unlock remote screen' : 'Lock remote screen';
+        }
+
+        // =============================================================
+        //  Wrap UI.connect — add ARD event listeners
+        // =============================================================
+
+        const _origUIConnect = UI.connect;
+        let ardConnectedBefore = false;             // has this page connected yet
+        UI.connect = function (evt, password) {
+            // The user clicked Connect, or the page is autoconnecting for
+            // the first time: once signed in, ask what kind of session to
+            // open, unless the URL has decided. Reconnects come without an
+            // event and reuse the choice made.
+            const firstConnect = !ardConnectedBefore;
+            ardConnectedBefore = true;
+            if (evt instanceof Event || firstConnect) {
+                ardAskOnThisConnect = !ardForcedChoice;
+                // Connecting by hand gives High Performance another chance.
+                // With the session decided by the URL no dialog would.
+                ardHpDisabled = false;
+            }
+            ardHpAttempt = null;
+
+            _origUIConnect.call(UI, evt, password);
+            ardInhibitReconnect = false;
+            if (UI.rfb) {
+                // Apply the session choice, initial quality and control mode
+                UI.rfb._ardControlMode = ardInitialControlMode;
+                // What is already known (a reconnect, or the URL) is in
+                // place from the start; the question after sign-in can
+                // still change it.
+                ardApplySessionChoice();
+                UI.rfb._ardAskSessionChoice = true;
+                UI.rfb.addEventListener('ardhpstate', ardOnHpState);
+                // Without the selector there would be no way back to
+                // the other displays, so stay on all of them
+                UI.rfb._ardAutoSelectDisplay = ardAutoSelectDisplay && showArdDisplaySelect;
+
+                // The Mac asks which session, or the connection has
+                // paused after sign-in for the choice: one dialog for both
+                UI.rfb.addEventListener('ardsessionselect', (e) => {
+                    ardOnSessionQuestion({ mode: 'select', username: e.detail.username });
+                });
+                UI.rfb.addEventListener('ardsessionchoice', (e) => {
+                    ardOnSessionQuestion({ mode: 'choice', username: e.detail.username });
+                });
+
+                // Remote user avatar
+                UI.rfb.addEventListener('arduserinfo', ardHandleUserInfo);
+
+                // Curtain state changes
+                UI.rfb.addEventListener('ardcurtainchange', ardUpdateCurtainButton);
+
+                // Display list arrived or changed
+                UI.rfb.addEventListener('arddisplayinfo', ardUpdateDisplayMenu);
+
+                // Update status bar when full encryption activates
+                UI.rfb.addEventListener('ardencryptionstate', () => {
+                    if (UI.connected) {
+                        UI.showStatus(ardConnectionStatusMessage());
+                    }
+                });
+            }
+        };
+
+        // =============================================================
+        //  ARD encryption-aware status message
+        // =============================================================
+
+        function ardConnectionStatusMessage() {
+            if (UI.rfb && UI.rfb._rfbAppleARD) {
+                if (UI.rfb._ardEncryptionEnabled) {
+                    return "Connected (encrypted) to " + UI.desktopName;
+                }
+                if (UI.rfb._ardAuthKey) {
+                    return "Connected (keystroke encryption) to " + UI.desktopName;
+                }
+                return "Connected (unencrypted) to " + UI.desktopName;
+            }
+            if (UI.getSetting('encrypt')) {
+                return "Connected (encrypted) to " + UI.desktopName;
+            }
+            return "Connected (unencrypted) to " + UI.desktopName;
+        }
+
+        // =============================================================
+        //  Wrap UI.connectFinished — reset reconnect counter + fix status
+        // =============================================================
+
+        // =============================================================
+        //  Mac Key Labels — swap Alt→Opt, Windows→Cmd on ARD
+        // =============================================================
+
+        function ardApplyMacKeyLabels() {
+            const altBtn = document.getElementById('noVNC_toggle_alt_button');
+            altBtn.src = "ard/images/opt.svg";
+            altBtn.alt = "Opt";
+            altBtn.title = "Toggle Option";
+
+            const winBtn = document.getElementById('noVNC_toggle_windows_button');
+            winBtn.src = "ard/images/cmd.svg";
+            winBtn.alt = "Cmd";
+            winBtn.title = "Toggle Command";
+        }
+
+        // =============================================================
+        //  Control bar: stay open if cursor is hovering, auto-close on leave
+        // =============================================================
+
+        // If the 2s auto-close timer fires while the cursor is on the
+        // control bar, cancel the close and leave the bar pinned open
+        // (as if the user clicked the handle to open it).
+        let ardControlbarHovered = false;
+        const controlBar = document.getElementById('noVNC_control_bar');
+        controlBar.addEventListener('mouseenter', () => { ardControlbarHovered = true; });
+        controlBar.addEventListener('mouseleave', () => { ardControlbarHovered = false; });
+
+        const _origCloseControlbar = UI.closeControlbar;
+        UI.closeControlbar = function () {
+            if (ardControlbarHovered && UI.closeControlbarTimeout) {
+                clearTimeout(UI.closeControlbarTimeout);
+                UI.closeControlbarTimeout = null;
+                return;
+            }
+            // Close ARD panels when control bar closes
+            if (ardInfoPanel) {
+                ardInfoPanel.classList.remove('noVNC_open');
+                ardInfoBtn.classList.remove('noVNC_selected');
+            }
+            document.getElementById('noVNC_quality_panel').classList.remove('noVNC_open');
+            document.getElementById('noVNC_quality_button').classList.remove('noVNC_selected');
+            ardCloseCurtainPanel();
+            ardCloseDisplayPanel();
+            _origCloseControlbar.call(UI);
+        };
+
+        const _origConnectFinished = UI.connectFinished;
+        UI.connectFinished = function (e) {
+            ardReconnectAttempt = 0;
+            ardInhibitReconnect = false;
+            _origConnectFinished.call(UI, e);
+            // Override upstream's wrong "unencrypted" status with ARD-aware message
+            UI.showStatus(ardConnectionStatusMessage());
+            if (UI.rfb && UI.rfb._rfbAppleARD) {
+                ardApplyMacKeyLabels();
+                ardUpdateClipboardButtons(true);
+                ardUpdateControlSettings();
+                if (showArdQuality) {
+                    document.getElementById('noVNC_quality_button').classList.remove('noVNC_hidden');
+                }
+                ardSyncQualityStops();
+                ardUpdateCurtainButton();
+                ardUpdateDisplayMenu();
+            }
+        };
+
+        // =============================================================
+        //  Wrap UI.disconnect — inhibit on manual disconnect
+        // =============================================================
+
+        const _origDisconnect = UI.disconnect;
+        UI.disconnect = function () {
+            ardInhibitReconnect = true;
+            ardReconnectCredentials = null;
+            ardReconnectAttempt = 0;
+            // Leaving the session clears any High Performance block it left:
+            // the next connection is a fresh start and tries it again.
+            ardHpDisabled = false;
+            if (ardReconnectCallback) {
+                clearTimeout(ardReconnectCallback);
+                ardReconnectCallback = null;
+            }
+            _origDisconnect.call(UI);
+        };
+
+        // =============================================================
+        //  Wrap UI.disconnectFinished — ARD auto-reconnect with backoff
+        // =============================================================
+
+        const _origDisconnectFinished = UI.disconnectFinished;
+        UI.disconnectFinished = function (e) {
+            ardHideAvatar();
+            ardUpdateClipboardButtons(false);
+            // Reset exclusive control UI
+            document.getElementById('noVNC_ard_exclusive_row').classList.add('noVNC_hidden');
+            document.getElementById('noVNC_setting_exclusive_control').checked = false;
+            document.getElementById('noVNC_quality_button').classList.add('noVNC_hidden');
+            document.getElementById('noVNC_quality_panel').classList.remove('noVNC_open');
+            document.getElementById('noVNC_quality_button').classList.remove('noVNC_selected');
+            document.getElementById('noVNC_curtain_button').classList.add('noVNC_hidden');
+            document.getElementById('noVNC_curtain_button').disabled = true;
+            ardCloseCurtainPanel();
+            ardHpUiReset();
+            ardCloseTypeDialog();
+            document.getElementById('noVNC_display_button').classList.add('noVNC_hidden');
+            document.getElementById('noVNC_display_list').replaceChildren();
+            ardCloseDisplayPanel();
+            const wasConnected = UI.connected;
+            const isARD = wasConnected && ardReconnectCredentials !== null;
+            const onVirtualDisplay = !!(UI.rfb && UI.rfb.ardOnVirtualDisplay && UI.rfb.ardOnVirtualDisplay());
+
+            // The connection was lost before High Performance had a
+            // picture, or soon after. The Mac may not know the mode and
+            // hang up on what it is sent, or end such sessions itself:
+            // either way the next connection must not go the same way.
+            const attempt = ardHpAttempt;
+            ardHpAttempt = null;
+            if (attempt && wasConnected && !ardInhibitReconnect &&
+                (attempt.streamingSince === null ||
+                 performance.now() - attempt.streamingSince < ardHpEarlyMs)) {
+                ardHpDisabled = true;
+                Log.Warn('ARD: connection lost ' + (attempt.streamingSince === null
+                    ? 'before High Performance started' : 'soon after High Performance started'));
+                ardNotice('The connection was lost in High Performance. Using Standard.', 'warn', 8000);
+            }
+
+            if (isARD && !ardInhibitReconnect) {
+                // Circuit breaker: rapid disconnect loop detection
+                const now = Date.now();
+                if ((now - ardLastDisconnectTime) < 2000 && ardReconnectAttempt > 0) {
+                    ardReconnectAttempt = 0;
+                    ardReconnectCredentials = null;
+                    _origDisconnectFinished.call(UI, e);
+                    return;
+                }
+                ardLastDisconnectTime = now;
+                ardReconnectAttempt++;
+
+                if (ardReconnectAttempt > ardReconnectMaxAttempts) {
+                    ardReconnectAttempt = 0;
+                    ardReconnectCredentials = null;
+                    _origDisconnectFinished.call(UI, e);
+                    return;
+                }
+
+                // Backs off; longer after a session on a virtual display,
+                // which a Mac needs time to take down
+                const delay = reconnectDelay(ardReconnectAttempt, onVirtualDisplay);
+
+                // Show reconnecting UI
+                UI.connected = false;
+                UI.rfb = undefined;
+                document.getElementById('noVNC_transition_text').textContent =
+                    'Reconnecting...';
+                UI.updateVisualState('reconnecting');
+
+                ardReconnectCallback = setTimeout(() => {
+                    ardReconnectCallback = null;
+                    if (ardInhibitReconnect) return;
+                    UI.connect(null, ardReconnectCredentials && ardReconnectCredentials.password);
+                }, delay);
+                return;
+            }
+
+            _origDisconnectFinished.call(UI, e);
+        };
+
+        // =============================================================
+        //  Cancel reconnect button
+        // =============================================================
+
+        document.getElementById('noVNC_cancel_reconnect_button')
+            .addEventListener('click', () => {
+                ardInhibitReconnect = true;
+                if (ardReconnectCallback) {
+                    clearTimeout(ardReconnectCallback);
+                    ardReconnectCallback = null;
+                }
+                ardReconnectAttempt = 0;
+                ardReconnectCredentials = null;
+                UI.updateVisualState('disconnected');
+                UI.openControlbar();
+                UI.openConnectPanel();
+            });
+    </script>
+</head>
+
+<body>
+
+    <div id="noVNC_fallback_error" class="noVNC_center">
+        <div>
+            <div>noVNC encountered an error:</div>
+            <br>
+            <div id="noVNC_fallback_errormsg"></div>
+        </div>
+    </div>
+
+    <!-- noVNC control bar -->
+    <div id="noVNC_control_bar_anchor" class="noVNC_vcenter">
+
+        <div id="noVNC_control_bar">
+            <div id="noVNC_control_bar_handle" title="Hide/Show the control bar"><div></div></div>
+
+            <div class="noVNC_scroll">
+
+            <div id="noVNC_toolbar_logo_slot"></div>
+
+            <hr>
+
+            <!-- Remote user avatar -->
+            <div id="noVNC_ard_user_avatar" class="noVNC_button noVNC_hidden" title="">
+                <img id="noVNC_ard_user_avatar_img" alt="">
+            </div>
+
+            <!-- Drag/Pan the viewport -->
+            <input type="image" alt="Drag" src="noVNC/app/images/drag.svg"
+                id="noVNC_view_drag_button" class="noVNC_button noVNC_hidden"
+                title="Move/Drag viewport">
+
+            <!--noVNC touch device only buttons-->
+            <div id="noVNC_mobile_buttons">
+                <input type="image" alt="Keyboard" src="noVNC/app/images/keyboard.svg"
+                    id="noVNC_keyboard_button" class="noVNC_button" title="Show keyboard">
+            </div>
+
+            <!-- Extra manual keys -->
+            <input type="image" alt="Extra keys" src="noVNC/app/images/toggleextrakeys.svg"
+                id="noVNC_toggle_extra_keys_button" class="noVNC_button"
+                title="Show extra keys">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_modifiers" class="noVNC_panel">
+                <input type="image" alt="Ctrl" src="noVNC/app/images/ctrl.svg"
+                    id="noVNC_toggle_ctrl_button" class="noVNC_button"
+                    title="Toggle Ctrl">
+                <input type="image" alt="Alt" src="noVNC/app/images/alt.svg"
+                    id="noVNC_toggle_alt_button" class="noVNC_button"
+                    title="Toggle Alt">
+                <input type="image" alt="Windows" src="noVNC/app/images/windows.svg"
+                    id="noVNC_toggle_windows_button" class="noVNC_button"
+                    title="Toggle Windows">
+                <input type="image" alt="Tab" src="noVNC/app/images/tab.svg"
+                    id="noVNC_send_tab_button" class="noVNC_button"
+                    title="Send Tab">
+                <input type="image" alt="Esc" src="noVNC/app/images/esc.svg"
+                    id="noVNC_send_esc_button" class="noVNC_button"
+                    title="Send Escape">
+                <input type="image" alt="Ctrl+Alt+Del" src="noVNC/app/images/ctrlaltdel.svg"
+                    id="noVNC_send_ctrl_alt_del_button" class="noVNC_button"
+                    title="Send Ctrl-Alt-Del">
+            </div>
+            </div>
+
+            <!-- Shutdown/Reboot -->
+            <input type="image" alt="Shutdown/Reboot" src="noVNC/app/images/power.svg"
+                id="noVNC_power_button" class="noVNC_button"
+                title="Shutdown/Reboot...">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_power" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="noVNC/app/images/power.svg"> Power
+                </div>
+                <input type="button" id="noVNC_shutdown_button" value="Shutdown">
+                <input type="button" id="noVNC_reboot_button" value="Reboot">
+                <input type="button" id="noVNC_reset_button" value="Reset">
+            </div>
+            </div>
+
+            <!-- Clipboard -->
+            <input type="image" alt="Clipboard" src="noVNC/app/images/clipboard.svg"
+                id="noVNC_clipboard_button" class="noVNC_button"
+                title="Clipboard">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_clipboard" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="noVNC/app/images/clipboard.svg"> Clipboard
+                </div>
+                <p class="noVNC_subheading">
+                    Edit clipboard content in the textarea below.
+                </p>
+                <textarea id="noVNC_clipboard_text" rows=5></textarea>
+            </div>
+            </div>
+
+            <!-- ARD clipboard buttons (replace legacy panel on ARD connections) -->
+            <button id="noVNC_clipboard_sync_button" class="noVNC_button noVNC_icon_btn noVNC_hidden"
+                    disabled title="Toggle clipboard auto-sync">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><g transform="translate(6.5,8.5) scale(0.458)" stroke-width="3.5"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></g>
+                </svg>
+            </button>
+            <button id="noVNC_clipboard_get_button" class="noVNC_button noVNC_icon_btn noVNC_hidden"
+                    disabled title="Get remote clipboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M16 4h2a2 2 0 0 1 2 2v4"/><path d="M21 14H11"/><path d="m15 10-4 4 4 4"/>
+                </svg>
+            </button>
+            <button id="noVNC_clipboard_send_button" class="noVNC_button noVNC_icon_btn noVNC_hidden"
+                    disabled title="Send local clipboard to remote">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/>
+                </svg>
+            </button>
+
+            <!-- ARD curtain / screen lock -->
+            <button id="noVNC_curtain_button" class="noVNC_button noVNC_icon_btn noVNC_hidden"
+                    disabled title="Lock remote screen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+                </svg>
+            </button>
+            <div class="noVNC_vcenter">
+            <div id="noVNC_curtain_panel" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <svg class="noVNC_heading_icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Lock Remote Screen
+                </div>
+                <p class="noVNC_subheading">Message shown on the remote screen:</p>
+                <input type="text" id="noVNC_curtain_message"
+                       placeholder="Custom message...">
+                <input type="button" id="noVNC_curtain_lock_button" value="Lock Screen">
+            </div>
+            </div>
+
+            <!-- ARD quality selector -->
+            <input type="image" alt="Image quality" src="ard/images/quality.svg"
+                id="noVNC_quality_button" class="noVNC_button noVNC_hidden"
+                title="Image quality">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_quality_panel" class="noVNC_panel">
+                <div id="noVNC_quality_wrap">
+                    <img src="ard/images/quality-high.svg" alt="High"
+                        class="noVNC_quality_icon">
+                    <div id="noVNC_quality_track">
+                        <div class="noVNC_quality_stop" data-preset="adaptive" data-hint="Adaptive · 24-bit, lossy (MVS)"></div>
+                        <div class="noVNC_quality_stop" data-preset="millions" data-hint="Full Color · 24-bit, lossless"></div>
+                        <div class="noVNC_quality_stop" data-preset="thousands" data-hint="Thousands · 16-bit color"></div>
+                        <div class="noVNC_quality_stop" data-preset="gray" data-hint="Grayscale · 16 grays"></div>
+                        <div class="noVNC_quality_stop" data-preset="halftone" data-hint="Black &amp; White · 1-bit"></div>
+                    </div>
+                    <img src="ard/images/quality-low.svg" alt="Low"
+                        class="noVNC_quality_icon">
+                </div>
+            </div>
+            </div>
+
+            <!-- ARD sound (High Performance) -->
+            <button id="noVNC_audio_button" class="noVNC_button noVNC_icon_btn noVNC_hidden"
+                    title="Mute the Mac's sound">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <path class="noVNC_audio_on" d="M15.5 8.5a5 5 0 0 1 0 7"/>
+                    <path class="noVNC_audio_on" d="M18.5 5.5a9 9 0 0 1 0 13"/>
+                    <path class="noVNC_audio_off" d="M22 9l-6 6"/>
+                    <path class="noVNC_audio_off" d="M16 9l6 6"/>
+                </svg>
+            </button>
+
+            <!-- ARD display selector -->
+            <button id="noVNC_display_button" class="noVNC_button noVNC_icon_btn noVNC_hidden"
+                    title="Displays">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>
+                </svg>
+            </button>
+            <div class="noVNC_vcenter">
+            <div id="noVNC_display_panel" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <svg class="noVNC_heading_icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>Displays
+                </div>
+                <div id="noVNC_display_list"></div>
+            </div>
+            </div>
+
+            <!-- Toggle fullscreen -->
+            <input type="image" alt="Full screen" src="noVNC/app/images/fullscreen.svg"
+                id="noVNC_fullscreen_button" class="noVNC_button noVNC_hidden"
+                title="Full screen">
+
+            <!-- Settings -->
+            <input type="image" alt="Settings" src="noVNC/app/images/settings.svg"
+                id="noVNC_settings_button" class="noVNC_button"
+                title="Settings">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_settings" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="noVNC/app/images/settings.svg"> Settings
+                </div>
+                <ul>
+                    <li>
+                        <label>
+                            <input id="noVNC_setting_shared" type="checkbox"
+                                   class="toggle">
+                            Shared mode
+                        </label>
+                    </li>
+                    <li>
+                        <label>
+                            <input id="noVNC_setting_view_only" type="checkbox"
+                                   class="toggle">
+                            View only
+                        </label>
+                    </li>
+                    <li id="noVNC_ard_exclusive_row" class="noVNC_hidden">
+                        <label>
+                            <input id="noVNC_setting_exclusive_control" type="checkbox"
+                                   class="toggle">
+                            Exclusive control
+                        </label>
+                    </li>
+                    <li><hr></li>
+                    <li>
+                        <label>
+                            <input id="noVNC_setting_view_clip" type="checkbox"
+                                   class="toggle">
+                            Clip to window
+                        </label>
+                    </li>
+                    <li>
+                        <label for="noVNC_setting_resize">Scaling mode:</label>
+                        <select id="noVNC_setting_resize" name="vncResize">
+                            <option value="off">None</option>
+                            <option value="scale" selected>Local scaling</option>
+                            <option value="remote">Remote resizing</option>
+                        </select>
+                    </li>
+                    <li><hr></li>
+                    <li>
+                        <label>
+                            <input id="noVNC_setting_natural_scrolling" type="checkbox"
+                                   class="toggle" checked>
+                            Natural scrolling
+                        </label>
+                    </li>
+                    <li><hr></li>
+                    <li>
+                        <div class="noVNC_expander">Advanced</div>
+                        <div><ul>
+                            <li>
+                                <label for="noVNC_setting_quality">Quality:</label>
+                                <input id="noVNC_setting_quality" type="range" min="0" max="9" value="6">
+                            </li>
+                            <li>
+                                <label for="noVNC_setting_compression">Compression level:</label>
+                                <input id="noVNC_setting_compression" type="range" min="0" max="9" value="2">
+                            </li>
+                            <li>
+                                <label for="noVNC_setting_ardEncryption">ARD encryption:</label>
+                                <select id="noVNC_setting_ardEncryption" name="ardEncryption">
+                                    <option value="2">Full tunnel (default)</option>
+                                    <option value="1">Keystroke only</option>
+                                </select>
+                            </li>
+                            <li>
+                                <label>
+                                    <input id="noVNC_setting_ardHpShowLocalCursor" type="checkbox"
+                                           class="toggle">
+                                    Show local cursor (High Performance)
+                                </label>
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <label for="noVNC_setting_repeaterID">Repeater ID:</label>
+                                <input id="noVNC_setting_repeaterID" type="text" value="">
+                            </li>
+                            <li>
+                                <div class="noVNC_expander">WebSocket</div>
+                                <div><ul>
+                                    <li>
+                                        <label>
+                                            <input id="noVNC_setting_encrypt" type="checkbox"
+                                                   class="toggle">
+                                            Encrypt
+                                        </label>
+                                    </li>
+                                    <li>
+                                        <label for="noVNC_setting_host">Host:</label>
+                                        <input id="noVNC_setting_host">
+                                    </li>
+                                    <li>
+                                        <label for="noVNC_setting_port">Port:</label>
+                                        <input id="noVNC_setting_port" type="number">
+                                    </li>
+                                    <li>
+                                        <label for="noVNC_setting_path">Path:</label>
+                                        <input id="noVNC_setting_path" type="text" value="websockify">
+                                    </li>
+                                </ul></div>
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <label>
+                                    <input id="noVNC_setting_reconnect" type="checkbox"
+                                           class="toggle">
+                                    Automatic reconnect
+                                </label>
+                            </li>
+                            <li>
+                                <label for="noVNC_setting_reconnect_delay">Reconnect delay (ms):</label>
+                                <input id="noVNC_setting_reconnect_delay" type="number">
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <label>
+                                    <input id="noVNC_setting_show_dot" type="checkbox"
+                                           class="toggle">
+                                    Show dot when no cursor
+                                </label>
+                            </li>
+                            <li>
+                                <label>
+                                    <input id="noVNC_setting_keep_device_awake" type="checkbox"
+                                            class="toggle">
+                                    Keep client display awake while connected
+                                </label>
+                            </li>
+                            <li><hr></li>
+                            <!-- Logging selection dropdown -->
+                            <li>
+                                <label>Logging:
+                                    <select id="noVNC_setting_logging" name="vncLogging">
+                                    </select>
+                                </label>
+                            </li>
+                        </ul></div>
+                    </li>
+                    <li class="noVNC_version_separator"><hr></li>
+                    <li class="noVNC_version_wrapper">
+                        <span>Version:</span>
+                        <span class="noVNC_version"></span>
+                    </li>
+                </ul>
+            </div>
+            </div>
+
+            <!-- ARD Connection Info -->
+            <input type="image" alt="Info" src="noVNC/app/images/info.svg"
+                id="ard_info_button" class="noVNC_button"
+                title="Connection info">
+            <div class="noVNC_vcenter">
+            <div id="ard_info_panel" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="noVNC/app/images/info.svg"> Connection Info
+                </div>
+                <table class="ard_info_table">
+                    <tr><td>Server</td><td id="ard_info_server">—</td></tr>
+                    <tr><td>Resolution</td><td id="ard_info_resolution">—</td></tr>
+                    <tr><td>Displays</td><td id="ard_info_displays">—</td></tr>
+                    <tr><td>Encryption</td><td id="ard_info_encryption">—</td></tr>
+                    <tr><td>Quality</td><td id="ard_info_quality">—</td></tr>
+                    <tr id="ard_info_video_row" class="noVNC_hidden"><td>Video</td><td id="ard_info_video">—</td></tr>
+                    <tr id="ard_info_audio_row" class="noVNC_hidden"><td>Sound</td><td id="ard_info_audio">—</td></tr>
+                    <tr><td>Mode</td><td id="ard_info_mode">—</td></tr>
+                    <tr><td>Session</td><td id="ard_info_session">—</td></tr>
+                    <tr><td>Remote User</td><td id="ard_info_user">—</td></tr>
+                    <tr><td>Keyboard</td><td id="ard_info_keyboard">—</td></tr>
+                    <tr><td>Protocol</td><td id="ard_info_protocol">—</td></tr>
+                </table>
+            </div>
+            </div>
+
+            <!-- Connection controls -->
+            <input type="image" alt="Disconnect" src="ard/images/disconnect.svg"
+                id="noVNC_disconnect_button" class="noVNC_button"
+                title="Disconnect">
+
+            </div>
+        </div>
+
+    </div> <!-- End of noVNC_control_bar -->
+
+    <div id="noVNC_hint_anchor" class="noVNC_vcenter">
+        <div id="noVNC_control_bar_hint">
+        </div>
+    </div>
+
+    <!-- Status dialog -->
+    <div id="noVNC_status"></div>
+
+    <!-- Connect button -->
+    <div class="noVNC_center">
+        <div id="noVNC_connect_dlg">
+            <p id="noVNC_connect_logo" class="noVNC_logo" translate="no"></p>
+            <div>
+                <button id="noVNC_connect_button"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Server key verification dialog -->
+    <div class="noVNC_center noVNC_connect_layer">
+    <div id="noVNC_verify_server_dlg" class="noVNC_panel"><form>
+        <div class="noVNC_heading">
+            Server identity
+        </div>
+        <div>
+            The server has provided the following identifying information:
+        </div>
+        <div id="noVNC_fingerprint_block">
+            Fingerprint:
+            <span id="noVNC_fingerprint"></span>
+        </div>
+        <div>
+            Please verify that the information is correct and press
+            "Approve". Otherwise press "Reject".
+        </div>
+        <div class="button_row">
+            <input id="noVNC_approve_server_button" type="submit" value="Approve">
+            <input id="noVNC_reject_server_button" type="button" value="Reject">
+        </div>
+    </form></div>
+    </div>
+
+    <!-- Password dialog -->
+    <div class="noVNC_center noVNC_connect_layer">
+    <div id="noVNC_credentials_dlg" class="noVNC_panel"><form>
+        <div class="noVNC_heading">
+            Credentials
+        </div>
+        <div id="noVNC_username_block">
+            <label for="noVNC_username_input">Username:</label>
+            <input id="noVNC_username_input">
+        </div>
+        <div id="noVNC_password_block">
+            <label for="noVNC_password_input">Password:</label>
+            <input id="noVNC_password_input" type="password">
+        </div>
+        <div class="button_row">
+            <input id="noVNC_credentials_button" type="submit" value="Send credentials">
+        </div>
+    </form></div>
+    </div>
+
+    <!-- ARD Session Choice Dialog -->
+    <div id="noVNC_ard_type_dlg" class="noVNC_panel">
+        <div class="noVNC_heading" style="display:flex;justify-content:space-between;align-items:center">
+            Choose Session Type
+            <a href="#" id="noVNC_ard_type_disconnect"
+                style="color:rgba(255,255,255,0.7);text-decoration:none;font-size:1.1em;
+                       line-height:1;padding:0 2px"
+                title="Disconnect">&times;</a>
+        </div>
+        <p class="noVNC_session_info"><strong><span id="noVNC_ard_session_username"></span></strong> is currently using the display on <strong><span id="noVNC_ard_session_hostname"></span></strong>.</p>
+        <p class="noVNC_session_auth" style="margin:0;font-size:0.85em;color:#666;text-align:right">Connected as <strong><span id="noVNC_ard_session_authuser"></span></strong></p>
+        <label class="noVNC_ard_type_row">
+            <input type="radio" name="ard_display" value="share">
+            <span><strong>Share Display</strong>
+                <small>See and control what is on the Mac's own screens</small></span>
+        </label>
+        <label class="noVNC_ard_type_row">
+            <input type="radio" name="ard_display" value="virtual">
+            <span><strong>Virtual Display</strong>
+                <small>A display the Mac makes for this session</small></span>
+        </label>
+        <div id="noVNC_ard_type_quality">
+            <label class="noVNC_ard_type_row">
+                <input type="radio" name="ard_quality" value="highperf">
+                <span><strong>High Performance</strong>
+                    <small id="noVNC_ard_type_hp_note"></small></span>
+            </label>
+            <label class="noVNC_ard_type_row" id="noVNC_ard_type_resize_row"
+                   style="margin-left:1.6em">
+                <input type="checkbox" id="noVNC_ard_type_resize">
+                <span><strong>Resize to window</strong>
+                    <small>Display follows the window, sharp at any size</small></span>
+            </label>
+            <label class="noVNC_ard_type_row">
+                <input type="radio" name="ard_quality" value="standard">
+                <span><strong>Standard</strong>
+                    <small>Works with most network conditions</small></span>
+            </label>
+        </div>
+        <div class="button_row">
+            <button id="noVNC_ard_type_cancel">Disconnect</button>
+            <button id="noVNC_ard_type_continue" class="noVNC_submit">Continue</button>
+        </div>
+    </div>
+
+    <!-- Transition screens -->
+    <div id="noVNC_transition">
+        <div id="noVNC_transition_text"></div>
+        <div>
+        <input type="button" id="noVNC_cancel_reconnect_button" value="Cancel">
+        </div>
+        <div class="noVNC_spinner"></div>
+    </div>
+
+    <!-- This is where the RFB elements will attach -->
+    <div id="noVNC_container">
+        <textarea id="noVNC_keyboardinput" autocapitalize="off"
+            autocomplete="off" spellcheck="false" tabindex="-1"></textarea>
+    </div>
+
+    <audio id="noVNC_bell">
+        <source src="noVNC/app/sounds/bell.oga" type="audio/ogg">
+        <source src="noVNC/app/sounds/bell.mp3" type="audio/mpeg">
+    </audio>
+ </body>
+</html>

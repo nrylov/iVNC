@@ -1,0 +1,14 @@
+{
+  "jdk": {
+    "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.21_9.tar.gz",
+    "sha256": "78b08c7f5a0598242d5719c022e19479cb4a3aa45c37c19726a757a469ed1c15"
+  },
+  "androidTools": {
+    "url": "https://dl.google.com/android/repository/commandlinetools-mac-13114758_latest.zip",
+    "sha256": "5673201e6f3869f418eeed3b5cb6c4be7401502bd0aae1b12a29d164d647a54e"
+  },
+  "gradle": {
+    "url": "https://services.gradle.org/distributions/gradle-8.11.1-bin.zip",
+    "sha256": "f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6"
+  }
+}

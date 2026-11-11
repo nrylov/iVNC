@@ -1,0 +1,5 @@
+<!-- Synthetic decoder test entry point exists only in the debug APK. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<instrumentation android:name=".NativeDecodeInstrumentation" android:targetPackage="dev.applescreen.prototype" android:label="Synthetic HEVC decoder tests" />
+<instrumentation android:name=".VideoIntegrationInstrumentation" android:targetPackage="dev.applescreen.prototype" android:label="Native video integration tests" />
+</manifest>

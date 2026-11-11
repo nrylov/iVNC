@@ -1,0 +1,2 @@
+// Pinned Android plugin for reproducible project-local builds.
+plugins { id 'com.android.application' version '8.9.2' apply false }

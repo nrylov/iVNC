@@ -1,0 +1,91 @@
+{
+  "sampleOrigin": "Synthetic x265 test pattern; not an Apple session capture",
+  "sampleSize": "320x180, 12 frames",
+  "interpretation": "Output frames prove this sample was decoded, not real-time Apple stream compatibility or visual correctness.",
+  "results": [
+    {
+      "decoder": "c2.qti.hevc.decoder",
+      "hardware": true,
+      "sample": "hevc420.mp4",
+      "chroma": "4:2:0 Main control",
+      "outputFormat": "{max-height=4320, sar-width=1, color-format=21, mime=video/raw, hdr-static-info=java.nio.HeapByteBuffer[pos=0 lim=25 cap=25], stride=384, color-standard=2, feature-secure-playback=0, color-transfer=3, sar-height=1, crop-bottom=179, color-range=2, crop-top=0, rotation-degrees=0, frame-rate=30, height=180, crop-right=319, slice-height=192, image-data=java.nio.HeapByteBuffer[pos=0 lim=104 cap=104], timeUs=0, priority=4, hdr10-plus-info=java.nio.HeapByteBuffer[pos=0 lim=0 cap=0], max-width=8192, crop-left=0, width=320}",
+      "outcome": "decoded-all-frames",
+      "inputFrames": 12,
+      "outputFrames": 12,
+      "outputBytes": 1307904,
+      "endOfStream": true,
+      "elapsedMs": 82
+    },
+    {
+      "decoder": "c2.qti.hevc.decoder",
+      "hardware": true,
+      "sample": "hevc444.mp4",
+      "chroma": "4:4:4 RExt high-tier level 5.1",
+      "outcome": "rejected-or-failed",
+      "failedStage": "decode",
+      "errorClass": "IllegalStateException",
+      "message": "Invalid to call at Released state; only valid in executing state\n",
+      "inputFrames": 2,
+      "outputFrames": 0,
+      "outputBytes": 0,
+      "endOfStream": false,
+      "elapsedMs": 25
+    },
+    {
+      "decoder": "c2.qti.hevc.decoder.low_latency",
+      "hardware": true,
+      "sample": "hevc420.mp4",
+      "chroma": "4:2:0 Main control",
+      "outputFormat": "{max-height=4320, sar-width=1, color-format=21, mime=video/raw, hdr-static-info=java.nio.HeapByteBuffer[pos=0 lim=25 cap=25], stride=384, color-standard=2, feature-secure-playback=0, color-transfer=3, sar-height=1, crop-bottom=179, color-range=2, crop-top=0, rotation-degrees=0, frame-rate=30, height=180, crop-right=319, slice-height=192, image-data=java.nio.HeapByteBuffer[pos=0 lim=104 cap=104], timeUs=0, priority=4, hdr10-plus-info=java.nio.HeapByteBuffer[pos=0 lim=0 cap=0], max-width=8192, crop-left=0, width=320}",
+      "outcome": "decoded-all-frames",
+      "inputFrames": 12,
+      "outputFrames": 12,
+      "outputBytes": 1307904,
+      "endOfStream": true,
+      "elapsedMs": 34
+    },
+    {
+      "decoder": "c2.qti.hevc.decoder.low_latency",
+      "hardware": true,
+      "sample": "hevc444.mp4",
+      "chroma": "4:4:4 RExt high-tier level 5.1",
+      "outcome": "rejected-or-failed",
+      "failedStage": "decode",
+      "errorClass": "IllegalStateException",
+      "message": "Pending dequeue output buffer request cancelled\n",
+      "inputFrames": 1,
+      "outputFrames": 0,
+      "outputBytes": 0,
+      "endOfStream": false,
+      "elapsedMs": 20
+    },
+    {
+      "decoder": "c2.android.hevc.decoder",
+      "hardware": false,
+      "sample": "hevc420.mp4",
+      "chroma": "4:2:0 Main control",
+      "outputFormat": "{crop-right=319, max-height=240, sar-width=1, color-format=19, slice-height=180, image-data=java.nio.HeapByteBuffer[pos=0 lim=104 cap=104], mime=video/raw, stride=320, color-standard=0, color-transfer=0, sar-height=1, crop-bottom=179, max-width=320, crop-left=0, width=320, color-range=2, crop-top=0, rotation-degrees=0, height=180}",
+      "outcome": "decoded-all-frames",
+      "inputFrames": 12,
+      "outputFrames": 12,
+      "outputBytes": 1036800,
+      "endOfStream": true,
+      "elapsedMs": 27
+    },
+    {
+      "decoder": "c2.android.hevc.decoder",
+      "hardware": false,
+      "sample": "hevc444.mp4",
+      "chroma": "4:4:4 RExt high-tier level 5.1",
+      "outcome": "rejected-or-failed",
+      "failedStage": "decode",
+      "errorClass": "IllegalStateException",
+      "message": "queueInputBuffer() is valid only at Executing states; currently at Released state\n",
+      "inputFrames": 0,
+      "outputFrames": 0,
+      "outputBytes": 0,
+      "endOfStream": false,
+      "elapsedMs": 8
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# Preserve generated third-party libav assets verbatim, including upstream whitespace.
+ard/hp/vendor/** -whitespace

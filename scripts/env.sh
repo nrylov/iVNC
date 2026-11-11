@@ -1,0 +1,15 @@
+#!/bin/bash
+# Project-local tool environment; source only from the project's command wrappers.
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export JAVA_HOME="$PROJECT_ROOT/.dev/jdk/Contents/Home"
+export ANDROID_HOME="$PROJECT_ROOT/.dev/android-sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export ANDROID_USER_HOME="$PROJECT_ROOT/.dev/android-user"
+export GRADLE_USER_HOME="$PROJECT_ROOT/.dev/gradle-user"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/pinned/bin:$ANDROID_HOME/platform-tools:$PROJECT_ROOT/.dev/gradle-8.11.1/bin:$PATH"
+export ANDROID_EMULATOR_HOME="$PROJECT_ROOT/.dev/emulator"
+export ANDROID_AVD_HOME="$PROJECT_ROOT/.dev/avd"
+export XDG_CACHE_HOME="$PROJECT_ROOT/.dev/cache"
+export JAVA_TOOL_OPTIONS="-Duser.home=$PROJECT_ROOT/.dev/java-home -Djava.util.prefs.userRoot=$PROJECT_ROOT/.dev/java-prefs"
+export TMPDIR="$PROJECT_ROOT/.dev/tmp"
+mkdir -p "$ANDROID_USER_HOME" "$GRADLE_USER_HOME" "$TMPDIR"

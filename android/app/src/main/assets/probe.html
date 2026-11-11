@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- Compact Android desktop viewer; connection and diagnostics live in a separate panel. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Mac Screen</title><link rel="stylesheet" href="probe.css"></head>
+<body>
+<header><strong>Mac Screen</strong><button id="settings-open">Connection</button><button id="get" disabled>Get clip</button><button id="send" disabled>Send clip</button></header>
+<p id="status" role="status">Connect to your Mac to begin.</p>
+<nav class="view-tools" aria-label="Desktop controls"><button id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-value">100%</span><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-fit">Fit</button><span class="spacer"></span><span id="video-state">Offline</span><button id="cmdc" disabled>⌘C</button><button id="cmdv" disabled>⌘V</button></nav>
+<div id="screen" aria-label="Remote desktop"></div>
+<section id="trackpad-controls" aria-label="Trackpad controls"><div id="trackpad" aria-label="Relative mouse trackpad">Trackpad · tap to click · two fingers to scroll</div>
+<div class="click-buttons"><button id="left-click" disabled>Left click</button><button id="right-click" disabled>Right click</button><button id="drag" aria-pressed="false" disabled>Drag lock</button></div></section>
+<dialog id="settings"><div class="panel-heading"><h1>Connection</h1><button id="settings-close">Done</button></div>
+<form id="connection">
+<label>Mac address <input id="host" placeholder="192.168.50…" required autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+<label>Port <input id="port" type="number" value="5900" min="1" max="65535" required></label>
+<label>Mac username <input id="username" autocomplete="off" autocapitalize="none" spellcheck="false" required></label>
+<label>Mac password <input id="password" type="password" autocomplete="off" required></label>
+<label class="wide">Video mode <select id="video-mode"><option value="standard">Standard · current Mac desktop</option><option value="auto">Auto · try 1080p High Performance</option><option value="highperf">High Performance · 1080p virtual display</option></select></label>
+<p class="wide help">High Performance creates a virtual display and uses software HEVC decoding. It falls back to Standard if negotiation fails. Audio is not included in this build.</p>
+<button id="connect">Connect</button><button type="button" id="disconnect">Disconnect</button></form>
+<div class="pointer-options"><label>Mouse mode <select id="pointer-mode"><option value="trackpad">Trackpad</option><option value="touch">Direct touch</option></select></label>
+<label>Pointer speed <select id="sensitivity"><option value="0.6">Slow</option><option value="1" selected>Normal</option><option value="1.7">Fast</option></select></label></div>
+<p class="help">In trackpad mode, pinch the desktop to zoom and drag it to pan. Use the pad below it to move the Mac cursor.</p>
+<label class="check"><input id="sync" type="checkbox" checked disabled> Receive Mac clipboard changes</label>
+<details><summary>Diagnostics</summary><button id="probe">Refresh report</button><button id="share">Share report</button><pre id="report"></pre></details>
+<details><summary>Session events</summary><pre id="events"></pre></details>
+<details><summary>Open-source licenses</summary><p>This app uses noVNC-ARD/noVNC under MPL-2.0 and replaceable FFmpeg libraries under LGPL-2.1-or-later. Corresponding FFmpeg source, license and build instructions are included in the APK’s assets/licenses/ffmpeg directory and the project source.</p></details>
+</dialog>
+<script type="module" src="probe.js"></script></body></html>
