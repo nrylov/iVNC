@@ -1,3 +1,16 @@
+# Native migration decision — 2026-11-11
+
+Owner selected LibVNCClient plus our own Android UI, with no AVNC app/UI code.
+See [native architecture and validation plan](NATIVE-CLIENT.md). The dependency
+is pinned under third_party/libvncserver; it is not wired into the app yet.
+No new native session, device or performance validation has been performed.
+
+Prototype follow-up controls, encrypted profiles and reconnect policy were built
+and preserved on pushed branch prototype-webview (c530e44); 465 Node tests passed.
+Those follow-up features still need phone validation. Main retains the initial
+hybrid client. Next: build the native client core, establish standard-mode login,
+rendering and input, then migrate Apple clipboard/control and HP media.
+
 # iVNC project update — 2026-11-11
 
 Canonical working repository is now ~/Repositories/iVNC, cloned from the owner's
