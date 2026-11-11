@@ -13,11 +13,14 @@ final class SessionBridge {
     private final Activity activity;
     private final VideoController video;
     private final Events events;
+    private final ProfileStore profiles;
+    private final java.util.function.Consumer<Boolean> viewerMode;
     private TcpTransport transport;
     private MediaTransport media;
     private String activeId = "", mediaId = "";
-    SessionBridge(Activity activity, VideoController video, Events events) {
+    SessionBridge(Activity activity, VideoController video, Events events, java.util.function.Consumer<Boolean> viewerMode) {
         this.activity = activity; this.video = video; this.events = events;
+        this.profiles = new ProfileStore(activity); this.viewerMode = viewerMode;
     }
     @JavascriptInterface public synchronized void connect(String id, String host, int port) {
         if (transport != null) transport.close("Reconnecting");
@@ -60,6 +63,10 @@ final class SessionBridge {
     @JavascriptInterface public void videoGeometry(String id, String rect) { video.geometry(id, rect); }
     @JavascriptInterface public void videoCursor(String id, double x, double y, boolean shown) { video.cursor(id, x, y, shown); }
     @JavascriptInterface public void videoClose(String id) { video.close(id); }
+    @JavascriptInterface public String loadProfile() { return profiles.load(); }
+    @JavascriptInterface public boolean saveProfile(String text) { return profiles.save(text); }
+    @JavascriptInterface public boolean forgetProfile() { return profiles.forget(); }
+    @JavascriptInterface public void viewerMode(boolean full) { activity.runOnUiThread(() -> viewerMode.accept(full)); }
     @JavascriptInterface public String decoderReport() { return DecoderProbe.report(); }
     @JavascriptInterface public void getClipboard(String id) {
         activity.runOnUiThread(() -> {
@@ -83,6 +90,11 @@ final class SessionBridge {
             intent.putExtra(android.content.Intent.EXTRA_TEXT, text);
             activity.startActivity(android.content.Intent.createChooser(intent, "Share diagnostic report"));
         });
+    }
+    synchronized void suspend() {
+        if (media != null) media.close("App backgrounded");
+        if (transport != null) transport.close("App backgrounded");
+        video.suspend();
     }
     synchronized void destroy() {
         if (media != null) media.close("Activity closed");

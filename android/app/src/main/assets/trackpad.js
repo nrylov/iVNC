@@ -1,6 +1,7 @@
 /* Android trackpad UI adapter for pinned noVNC-ARD. No upstream files are changed.
  * Private RFB pointer/display APIs are confined here; ARD retains button mapping. */
 import { TrackpadModel } from './trackpad-model.js';
+import { FullscreenPointer } from './fullscreen-pointer.js';
 
 /** Attaches relative input, separate click/drag controls, and a visible cursor. */
 export function attachTrackpad({ getRfb, isConnected }) {
@@ -39,6 +40,21 @@ export function attachTrackpad({ getRfb, isConnected }) {
             }));
         },
     });
+    const desktopPointer = new FullscreenPointer(model);
+    const desktopEnabled = () => isConnected() && mode.value === 'trackpad' && document.body.classList.contains('viewer-fullscreen');
+    screen.addEventListener('pointerdown', event => {
+        if (!desktopEnabled()) return;
+        event.preventDefault(); screen.setPointerCapture(event.pointerId);
+        desktopPointer.down(event.pointerId, event.clientX, event.clientY, event.timeStamp);
+    }, true);
+    screen.addEventListener('pointermove', event => {
+        if (desktopEnabled()) desktopPointer.move(event.pointerId, event.clientX, event.clientY);
+    }, true);
+    screen.addEventListener('pointerup', event => {
+        if (desktopEnabled()) desktopPointer.up(event.pointerId, event.timeStamp);
+    }, true);
+    screen.addEventListener('pointercancel', () => desktopPointer.cancel(), true);
+    window.addEventListener('viewerchange', () => { desktopPointer.cancel(); drag.setAttribute('aria-pressed', 'false'); });
     function paint() {
         const rfb = getRfb();
         const active = isConnected() && mode.value === 'trackpad';

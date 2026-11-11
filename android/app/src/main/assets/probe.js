@@ -1,12 +1,16 @@
 /* Android connection driver for pinned noVNC-ARD; credentials remain in process memory only. */
 import './ard/ard-patch.js';
 import RFB from './noVNC/core/rfb.js';
-import AsyncClipboard from './noVNC/core/clipboard.js';
 import { NativeChannel } from './native-channel.js';
 import { attachTrackpad } from './trackpad.js';
 import { attachZoom } from './zoom.js';
 import { configureVideo } from './high-performance.js';
 import { attachDiagnostics } from './diagnostics.js';
+import { attachClipboard } from './clipboard-control.js';
+import { ReconnectPolicy } from './reconnect-policy.js';
+import { restoreProfile, saveProfile, forgetProfile } from './profiles.js';
+import { attachKeyboard } from './keyboard.js';
+import { attachViewer } from './viewer.js';
 
 const element = id => document.getElementById(id);
 let rfb = null, channel = null, connected = false, configuration = null;
@@ -19,29 +23,27 @@ function setConnected(value) {
     connected = value;
     for (const id of ['send', 'get', 'sync', 'cmdc', 'cmdv']) element(id).disabled = !value;
     element('connect').disabled = value;
-    trackpad.update();
+    trackpad.update(); keyboard.update();
+    if (!value) viewer.set(false);
 }
 const trackpad = attachTrackpad({ getRfb: () => rfb, isConnected: () => connected });
 const zoom = attachZoom(() => rfb);
-AsyncClipboard.prototype.grab = function () {};
-AsyncClipboard.prototype.ungrab = function () {};
-AsyncClipboard.prototype.writeClipboard = function (text) {
-    Native.setClipboard(text);
-    status(`Received Mac clipboard (${text.length} characters)`);
-    return true;
+const keyboard = attachKeyboard(() => rfb, () => connected);
+const viewer = attachViewer(keyboard);
+const reconnect = new ReconnectPolicy({ connect, disconnect: () => stopSession('Suspended; reconnecting when you return') });
+attachClipboard({ getRfb: () => rfb, getChannel: () => channel, isConnected: () => connected, status });
+window.appLifecycle = state => {
+    reconnect.enabled = element('auto-reconnect').checked;
+    if (state === 'background') { keyboard.release(); reconnect.pause(); }
+    else reconnect.resume();
 };
-window.nativeEvent = (id, kind, value) => {
-    if (id !== channel?.id) return;
-    if (kind === 'clipboard') {
-        if (!connected) return;
-        if (value.length > 1024 * 1024) { status('Clipboard exceeds the 1 MiB limit'); return; }
-        rfb.forceClipboardPaste(value);
-        status(`Sent phone clipboard (${value.length} characters)`);
-        return;
-    }
-    channel.receive(kind, value);
-    if (kind === 'close') status(value);
-};
+document.addEventListener('visibilitychange', () => window.appLifecycle(document.hidden ? 'background' : 'foreground'));
+function stopSession(message) {
+    keyboard.release(); configuration = null;
+    const previous = rfb; rfb = null;
+    previous?.disconnect(); channel?.close(); setConnected(false);
+    videoState = 'disconnected'; status(message);
+}
 function fallback(current, config, reason) {
     if (rfb !== current || configuration !== config || config.authFailed || config.mode === 'standard' || config.fallingBack) return;
     config.fallingBack = true;
@@ -59,6 +61,7 @@ function connect(config) {
     previous?.disconnect();
     channel?.close();
     configuration = config;
+    reconnect.attempt(config);
     videoState = 'connecting';
     lastFrames = 0; lastTime = performance.now();
     channel = new NativeChannel(Native, config.host, config.port);
@@ -81,7 +84,8 @@ function connect(config) {
         if (rfb !== current) return;
         setConnected(true); trackpad.reset(); zoom.reset();
         current.enableClipboardSync(element('sync').checked);
-        document.activeElement?.blur(); element('settings').close();
+        saveProfile(config);
+        document.activeElement?.blur(); viewer.set(true);
         videoState = 'standard';
         if (mode !== 'standard' && !current._ardHpOffered()) { fallback(current, config, 'Mac did not offer it'); return; }
         status(mode === 'standard' ? 'Connected in Standard mode' : 'Connected; negotiating High Performance…');
@@ -94,12 +98,12 @@ function connect(config) {
     });
     current.addEventListener('disconnect', () => {
         if (rfb !== current || config.fallingBack) return;
-        setConnected(false); videoState = 'disconnected';
+        setConnected(false); reconnect.ended(); videoState = 'disconnected';
         if (config.mode !== 'standard' && configuration === config) { fallback(current, config, 'connection ended'); return; }
         configuration = null;
         status(config.authFailed ? 'Authentication failed; check the Mac username and password' : 'Disconnected');
     });
-    current.addEventListener('securityfailure', () => { config.authFailed = true; status('Authentication failed; check the Mac username and password'); });
+    current.addEventListener('securityfailure', () => { config.authFailed = true; reconnect.authenticationFailed(); status('Authentication failed; check the Mac username and password'); });
     status('Connecting…');
 }
 element('connection').onsubmit = event => {
@@ -107,21 +111,13 @@ element('connection').onsubmit = event => {
     failureReason = null;
     const config = { host: element('host').value.trim(), port: Number(element('port').value),
         username: element('username').value, password: element('password').value,
-        mode: element('video-mode').value };
+        mode: element('video-mode').value, requestedMode: element('video-mode').value };
     element('password').value = '';
     connect(config);
 };
-element('disconnect').onclick = () => {
-    configuration = null;
-    const previous = rfb; rfb = null;
-    previous?.disconnect(); channel?.close(); setConnected(false);
-    videoState = 'disconnected'; status('Disconnected');
-};
+element('disconnect').onclick = () => { reconnect.stop(); status('Disconnected'); };
 element('settings-open').onclick = () => element('settings').showModal();
 element('settings-close').onclick = () => element('settings').close();
-element('send').onclick = () => Native.getClipboard(channel.id);
-element('get').onclick = () => { rfb.requestRemoteClipboard(); status('Requested Mac clipboard'); };
-element('sync').onchange = () => rfb.enableClipboardSync(element('sync').checked);
 function commandKey(key) {
     rfb.sendKey(0xffeb, 'MetaLeft', true);
     rfb.sendKey(key, key === 99 ? 'KeyC' : 'KeyV');
@@ -140,4 +136,14 @@ setInterval(() => {
 attachDiagnostics(() => ({ state: videoState, fallbackReason: failureReason,
     presentedFrames: rfb?._ardHp?._sink?.stats.presented || 0,
     media: rfb?._ardHp?.stats || null }));
-element('settings').showModal();
+element('forget-profile').onclick = () => {
+    forgetProfile(); element('password').value = ''; element('auto-reconnect').checked = false; reconnect.enabled = false;
+};
+element('auto-reconnect').onchange = () => { reconnect.enabled = element('auto-reconnect').checked; if (configuration) saveProfile(configuration); };
+const saved = restoreProfile();
+trackpad.update();
+if (saved && saved.autoReconnect !== false) {
+    element('password').value = '';
+    if (document.hidden) { reconnect.attempt(saved); reconnect.active = false; reconnect.foreground = false; }
+    else connect(saved);
+} else element('settings').showModal();

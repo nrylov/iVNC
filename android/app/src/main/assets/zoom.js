@@ -51,7 +51,7 @@ export function attachZoom(getRfb) {
             const [a, b] = touches;
             apply(gesture.zoom * Math.hypot(a.x - b.x, a.y - b.y) / gesture.distance,
                 { u: gesture.u, v: gesture.v, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-        } else if (touches.length === 1 && gesture.type === 'pan') {
+        } else if (touches.length === 1 && gesture.type === 'pan' && !document.body.classList.contains('viewer-fullscreen')) {
             rfb._screen.scrollLeft -= touches[0].x - gesture.x;
             rfb._screen.scrollTop -= touches[0].y - gesture.y;
             gesture = { type: 'pan', ...touches[0] };

@@ -11,7 +11,7 @@ header button, .view-tools button { font-size: 12px; padding: 7px; }
 #status { margin: 0; padding: 5px 10px; color: #b7cadf; font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-height: 26px; }
 .view-tools { padding: 0 9px 6px; } .spacer { flex: 1; } #zoom-value { min-width: 40px; text-align: center; font-size: 12px; }
 #screen { flex: 1; position: relative; min-height: 80px; overflow: hidden; background: #03070c; }
-#trackpad-controls { flex: none; padding: 7px 9px; border-top: 1px solid #26364a; }
+#interaction-controls { flex: none; padding: 7px 9px; border-top: 1px solid #26364a; }
 #trackpad { height: 76px; border: 1px solid #405b7b; border-radius: 10px; background: #152337; color: #98b1ce; display: flex; align-items: center; justify-content: center; text-align: center; touch-action: none; user-select: none; font-size: 12px; }
 #trackpad[aria-disabled="true"] { opacity: .4; }
 .click-buttons { margin-top: 6px; } .click-buttons button { flex: 1; padding: 7px; font-size: 12px; }
@@ -29,3 +29,15 @@ input, select { width: 100%; min-width: 0; } .pointer-options { display: grid; g
 details { border-top: 1px solid #32465e; padding: 12px 0; } summary { cursor: pointer; margin-bottom: 8px; }
 pre { font: 11px monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (orientation: landscape) and (max-height: 600px) { #trackpad { height: 45px; } header { padding: 4px 9px; } }
+
+/* Full view leaves only the desktop and the native floating menu visible. */
+.viewer-fullscreen header, .viewer-fullscreen #status, .viewer-fullscreen .view-tools,
+.viewer-fullscreen #interaction-controls { display: none; }
+.viewer-fullscreen #screen { min-height: 0; }
+.keyboard-visible #interaction-controls { display: none; }
+#keyboard-dock { flex: none; padding: 6px 9px; border-top: 1px solid #40536d; background: #142033; }
+.keyboard-row { display: flex; gap: 5px; overflow-x: auto; margin-bottom: 5px; }
+.keyboard-row button { flex: none; padding: 8px; font-size: 12px; }
+.keyboard-row [aria-pressed="true"] { background: #2b719f; border-color: #b9e4ff; }
+#type-input { flex: 1; resize: none; min-width: 40px; height: 34px; padding: 6px; border: 1px solid #40536d; border-radius: 6px; background: #0b1727; color: inherit; }
+#function-keys { padding-right: 52px; }

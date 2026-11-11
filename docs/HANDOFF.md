@@ -1,3 +1,48 @@
+# Native migration approved — 2026-11-11
+
+Owner explicitly selected LibVNCClient as the native core with our own Android UI.
+Do not use AVNC app/UI code. Keep the existing prototype as a reference, preserve
+working Apple protocol evidence and native FFmpeg rendering, and remove WebView
+from the shipping client protocol/video path. All saved-profile, foreground
+reconnect, full-screen/floating controls and advanced keyboard requests remain.
+
+This branch preserves the compiled WebView follow-up as a reference checkpoint.
+It has 465 passing Node tests and a successful Android debug build. Its Keystore
+instrumentation test has not run on the phone. No claim of device validation for
+these follow-up UI features. The native migration continues from main.
+
+# Architecture decision checkpoint — 2026-11-11
+
+Owner's repository is ~/Repositories/iVNC, origin https://github.com/nrylov/iVNC.
+Initial import commit 610374b is pushed to main. The .dev environment was moved
+here (not copied globally); native shared libraries and APK rebuild successfully
+from this new path. Original apple-screen-client folder is a source backup.
+
+Current working-tree follow-up (not yet committed or installed): encrypted Android
+Keystore profile storage and Forget; foreground reconnection policy; native
+floating controls/full-screen mode; advanced keyboard; full-screen pointer input.
+465 Node tests pass and all Android UI modules parse; debug APK 0.4 builds.
+On-device profile encryption test exists but has not run. These additions must not
+be described as device-verified. Do not read or publish saved profile credentials.
+
+Owner questioned WebView/noVNC architecture and possible FPS costs. An async
+choice is pending: switch to native Android now (recommended) or profile the
+current prototype first. Preserve this working prototype as a reference.
+The actual current High Performance hot path is native UDP -> JSON/base64 JS
+bridge -> JS SRTP/depacketization -> base64 bridge -> native FFmpeg/Surface.
+Native decoding/rendering works, but the JS and bridge costs have not been
+measured. Poor overall FPS cannot yet be attributed exclusively to WebView.
+AVNC uses native LibVNCClient and is a potential standard-VNC/UI reference; Apple
+clipboard and High Performance extensions still require implementation. Retain
+source licenses and test vectors when choosing or porting a native base.
+
+Reusable native pieces: shared FFmpeg/JNI decoder, stripe compositor, texture and
+pointer overlays, UDP transport, Android Keystore ProfileStore. Keep all four
+owner requests (saved profiles/reconnect/full view/advanced keyboard) active if
+switching architecture; a native change does not cancel those requirements.
+
+## Previous integration notes
+
 # iVNC project update — 2026-11-11
 
 Canonical working repository is now ~/Repositories/iVNC, cloned from the owner's

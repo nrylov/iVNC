@@ -147,6 +147,7 @@ final class VideoController implements TextureView.SurfaceTextureListener {
         activity.runOnUiThread(() -> { if (active.isEmpty()) { clip.setAlpha(0); clip.setVisibility(View.INVISIBLE); } });
         enqueue(null, () -> { if (handle != 0) NativeVideo.destroy(handle); handle = 0; });
     }
+    void suspend() { close(active); }
     void destroy() {
         close(active);
         enqueue(null, () -> { if (surface != null) surface.release(); surface = null; });
