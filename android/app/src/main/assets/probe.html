@@ -17,6 +17,10 @@
 <label>Mac password <input id="password" type="password" autocomplete="off" required></label>
 <label class="wide">Video mode <select id="video-mode"><option value="standard">Standard · current Mac desktop</option><option value="auto">Auto · try 1080p High Performance</option><option value="highperf">High Performance · 1080p virtual display</option></select></label>
 <p class="wide help">High Performance creates a virtual display and uses software HEVC decoding. It falls back to Standard if negotiation fails. Audio is not included in this build.</p>
+<label class="check wide"><input id="remember" type="checkbox" checked> Remember connection, including password</label>
+<label class="check wide"><input id="auto-reconnect" type="checkbox" checked> Reconnect when returning to the app</label>
+<p id="profile-state" class="wide help">Saved login details are encrypted with Android Keystore.</p>
+<button type="button" id="forget-profile">Forget saved connection</button>
 <button id="connect">Connect</button><button type="button" id="disconnect">Disconnect</button></form>
 <div class="pointer-options"><label>Mouse mode <select id="pointer-mode"><option value="trackpad">Trackpad</option><option value="touch">Direct touch</option></select></label>
 <label>Pointer speed <select id="sensitivity"><option value="0.6">Slow</option><option value="1" selected>Normal</option><option value="1.7">Fast</option></select></label></div>

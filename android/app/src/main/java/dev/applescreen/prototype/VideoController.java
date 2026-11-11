@@ -19,7 +19,7 @@ final class VideoController implements TextureView.SurfaceTextureListener {
     private final Activity activity;
     private final Events events;
     private final boolean coalesce;
-    private boolean presentationPending;
+    private String presentationPendingFor = "";
     private final FrameLayout clip;
     private final TextureView texture;
     private final PointerOverlay pointer;
@@ -102,12 +102,12 @@ final class VideoController implements TextureView.SurfaceTextureListener {
     }
 
     private void queuePresentation(String id) {
-        if (presentationPending) return;
-        presentationPending = true;
+        if (!active.equals(id) || presentationPendingFor.equals(id)) return;
+        presentationPendingFor = id;
         // Append one render behind queued decodes. Never discard predictive HEVC
         // stripes, but avoid blocking on a full-screen Surface post for each stripe.
         enqueue(null, () -> {
-            presentationPending = false;
+            if (presentationPendingFor.equals(id)) presentationPendingFor = "";
             if (!active.equals(id) || handle == 0) return;
             int result = NativeVideo.present(handle);
             if (result < 0) events.emit(id, "error", "Native presentation failed (" + result + ")");
@@ -183,6 +183,7 @@ final class VideoController implements TextureView.SurfaceTextureListener {
         activity.runOnUiThread(() -> { if (active.isEmpty()) { clip.setAlpha(0); clip.setVisibility(View.INVISIBLE); } });
         enqueue(null, () -> { if (handle != 0) NativeVideo.destroy(handle); handle = 0; });
     }
+    void suspend() { close(active); }
     void destroy() {
         close(active);
         enqueue(null, () -> { if (surface != null) surface.release(); surface = null; });

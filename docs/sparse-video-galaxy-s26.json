@@ -69,6 +69,17 @@
   "backgroundIssue": {
     "failure": "Native video backlog exceeded",
     "ownerConfirmed": "Only after switching away",
-    "nextStep": "Clean background suspend and foreground reconnect"
+    "nextStep": "Clean background suspend and foreground reconnect",
+    "resolution": {
+      "build": "0.5-saved-connections",
+      "observedSequence": [
+        "High Performance streaming",
+        "clean background pause",
+        "foreground reconnect",
+        "High Performance streaming",
+        "clean background pause"
+      ],
+      "encryptedOwnerSaveObserved": true
+    }
   }
 }

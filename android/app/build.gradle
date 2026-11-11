@@ -8,8 +8,8 @@ android {
         minSdk 31
         targetSdk 35
         ndk { abiFilters 'arm64-v8a' }
-        versionCode 4
-        versionName '0.4-sparse-video'
+        versionCode 5
+        versionName '0.5-saved-connections'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

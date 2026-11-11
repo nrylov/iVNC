@@ -22,6 +22,12 @@ SDK, JDK, NDK and caches remain in ignored `.dev/`. See
 [Android setup and validation](docs/ANDROID-PROTOTYPE.md) and
 [current handoff](docs/HANDOFF.md) for implementation status and known limitations.
 
+## Saved connections
+
+The Android client can remember one connection and its password using Android
+Keystore encryption, and reconnect when returning from another app. See
+[saved login and reconnect behavior](docs/SAVED-CONNECTIONS.md).
+
 ## Performance comparison
 
 A debug-only synthetic replay harness compares the existing web video bridge

@@ -6,7 +6,7 @@ export function attachDiagnostics(getState) {
     let text = '';
     async function refresh() {
         const report = JSON.parse(Native.decoderReport());
-        report.appVersion = '0.4-sparse-video';
+        report.appVersion = '0.5-saved-connections';
         report.webview = navigator.userAgent;
         report.appleCodec = DEFAULT_CODEC;
         report.nativeSoftwareAvailable = Native.softwareVideoAvailable();

@@ -48,6 +48,19 @@ public final class MainActivity extends Activity {
                 JSONObject.quote(kind) + "," + JSONObject.quote(value) + ")", null);
         });
     }
+    @Override protected void onResume() {
+        super.onResume();
+        if (bridge != null) bridge.resume();
+        if (view != null) { view.onResume(); emit("appLifecycle", "foreground", "", ""); }
+    }
+    @Override protected void onPause() {
+        if (view != null) {
+            emit("appLifecycle", "background", "", "");
+            if (bridge != null) bridge.suspend();
+            view.onPause();
+        }
+        super.onPause();
+    }
     @Override protected void onDestroy() {
         destroyed = true;
         if (bridge != null) bridge.destroy();

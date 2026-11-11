@@ -1,3 +1,33 @@
+# Saved login and lifecycle milestone — 2026-11-11
+
+Owner confirmed the post-rendering-fix queue overflow happened ONLY after
+switching away. Foreground HP ran mostly above 60 FPS, dipping into the 50s.
+Owner now explicitly requested securely saved auth details too.
+
+Integrated focused code from prototype-webview: AES-256-GCM ProfileStore with
+Android Keystore, Remember/Forget controls and in-memory foreground reconnect.
+No broad UI rewrite was merged. MainActivity now resumes/suspends the bridge;
+backgrounding immediately stops video admission and closes media/TCP before
+pausing WebView. JS lifecycle/visibility policy reconnects on return without
+retrying failed auth or overriding explicit Disconnect. Live presentation tasks
+are scoped per stream so an old task cannot suppress a new stream's render.
+Saved data is written after successful login only. Cold launch pre-fills the
+form; it does not log in until Connect is pressed.
+
+Android 0.5-saved-connections built/installed. Validation: all 465 Node tests
+pass; real Galaxy Keystore persistence/randomization/tamper/Forget tests pass
+using a synthetic, separate test key; sparse/composited-worker/Surface restore
+regressions still match Mac pixels. Actual WebView controls and handlers bound.
+Live owner session showed successful encrypted save and automatic HP reconnect
+on return after clean background pause; another departure paused cleanly too. See
+[saved connections](SAVED-CONNECTIONS.md). Do not inspect or log owner credentials.
+
+Next: larger UI work
+(fullscreen floating controls/advanced keyboard) remains on prototype-webview.
+Native LibVNCClient session implementation and Standard-mode performance remain
+unresolved. Foreground HP rendering fix is commit 268d494; saved-login/lifecycle
+work follows it on main. Both are being pushed to the owner's repository.
+
 # Live High Performance presentation fix — 2026-11-11
 
 Owner reported one picture followed by 0 FPS, later sometimes ~30 FPS. Another

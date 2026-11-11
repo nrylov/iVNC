@@ -29,8 +29,10 @@ Review the combined native application license before distributing builds.
 ## Migration and validation
 
 The working hybrid app remains on `main`; the additional prototype controls,
-secure-profile implementation and reconnect policy are preserved on the pushed
-`prototype-webview` branch at `c530e44`. Reuse suitable owned components while
+secure-profile implementation and reconnect policy were preserved on the pushed
+`prototype-webview` branch at `c530e44`. Saved profiles and lifecycle reconnect
+are now integrated on main (Android 0.5); fullscreen/keyboard controls remain on
+that branch. Reuse suitable owned components while
 replacing the WebView protocol/UI runtime.
 
 The owner's immediate priority is a performance comparison before expanding the

@@ -7,6 +7,8 @@ import { attachTrackpad } from './trackpad.js';
 import { attachZoom } from './zoom.js';
 import { configureVideo } from './high-performance.js';
 import { attachDiagnostics } from './diagnostics.js';
+import { ReconnectPolicy } from './reconnect-policy.js';
+import { restoreProfile, saveProfile, forgetProfile } from './profiles.js';
 
 const element = id => document.getElementById(id);
 let rfb = null, channel = null, connected = false, configuration = null;
@@ -24,6 +26,18 @@ function setConnected(value) {
 }
 const trackpad = attachTrackpad({ getRfb: () => rfb, isConnected: () => connected });
 const zoom = attachZoom(() => rfb);
+const reconnect = new ReconnectPolicy({ connect, disconnect: () => stopSession('Paused; reconnecting when you return') });
+window.appLifecycle = state => {
+    reconnect.enabled = element('auto-reconnect').checked;
+    if (state === 'background') reconnect.pause(); else reconnect.resume();
+};
+document.addEventListener('visibilitychange', () => window.appLifecycle(document.hidden ? 'background' : 'foreground'));
+function stopSession(message) {
+    configuration = null;
+    const previous = rfb; rfb = null;
+    previous?.disconnect(); channel?.close(); setConnected(false);
+    videoState = 'disconnected'; status(message);
+}
 AsyncClipboard.prototype.grab = function () {};
 AsyncClipboard.prototype.ungrab = function () {};
 AsyncClipboard.prototype.writeClipboard = function (text) {
@@ -54,12 +68,14 @@ function fallback(current, config, reason) {
     }, 0);
 }
 function connect(config) {
+    if (!reconnect.foreground) return;
     const previous = rfb;
     rfb = null;
     setConnected(false);
     previous?.disconnect();
     channel?.close();
     configuration = config;
+    reconnect.attempt(config);
     videoState = 'connecting';
     lastFrames = 0; lastTime = performance.now();
     channel = new NativeChannel(Native, config.host, config.port);
@@ -80,7 +96,7 @@ function connect(config) {
     current.addEventListener('ardsessionselect', () => current.selectSessionType(mode === 'standard' ? 1 : 2));
     current.addEventListener('connect', () => {
         if (rfb !== current) return;
-        setConnected(true); trackpad.reset(); zoom.reset();
+        setConnected(true); trackpad.reset(); zoom.reset(); saveProfile(config);
         current.enableClipboardSync(element('sync').checked);
         document.activeElement?.blur(); element('settings').close();
         videoState = 'standard';
@@ -98,12 +114,12 @@ function connect(config) {
     });
     current.addEventListener('disconnect', () => {
         if (rfb !== current || config.fallingBack) return;
-        setConnected(false); videoState = 'disconnected';
+        setConnected(false); reconnect.ended(); videoState = 'disconnected';
         if (config.mode !== 'standard' && configuration === config) { fallback(current, config, 'connection ended'); return; }
         configuration = null;
         status(config.authFailed ? 'Authentication failed; check the Mac username and password' : 'Disconnected');
     });
-    current.addEventListener('securityfailure', () => { config.authFailed = true; status('Authentication failed; check the Mac username and password'); });
+    current.addEventListener('securityfailure', () => { config.authFailed = true; reconnect.authenticationFailed(); status('Authentication failed; check the Mac username and password'); });
     status('Connecting…');
 }
 element('connection').onsubmit = event => {
@@ -111,16 +127,12 @@ element('connection').onsubmit = event => {
     failureReason = null; lastHighPerformance = null;
     const config = { host: element('host').value.trim(), port: Number(element('port').value),
         username: element('username').value, password: element('password').value,
-        mode: element('video-mode').value };
+        mode: element('video-mode').value, requestedMode: element('video-mode').value };
+    if (!element('remember').checked) forgetProfile();
     element('password').value = '';
     connect(config);
 };
-element('disconnect').onclick = () => {
-    configuration = null;
-    const previous = rfb; rfb = null;
-    previous?.disconnect(); channel?.close(); setConnected(false);
-    videoState = 'disconnected'; status('Disconnected');
-};
+element('disconnect').onclick = () => { reconnect.stop(); status('Disconnected'); };
 element('settings-open').onclick = () => element('settings').showModal();
 element('settings-close').onclick = () => element('settings').close();
 element('send').onclick = () => Native.getClipboard(channel.id);
@@ -144,4 +156,14 @@ setInterval(() => {
 attachDiagnostics(() => ({ state: videoState, fallbackReason: failureReason, lastHighPerformance,
     presentedFrames: rfb?._ardHp?._sink?.stats.presented || 0,
     media: rfb?._ardHp?.stats || null }));
+element('forget-profile').onclick = () => {
+    forgetProfile(); element('password').value = '';
+    element('auto-reconnect').checked = false; reconnect.enabled = false;
+};
+element('remember').onchange = () => { if (!element('remember').checked) forgetProfile(); };
+element('auto-reconnect').onchange = () => {
+    reconnect.enabled = element('auto-reconnect').checked;
+    if (configuration) saveProfile(configuration);
+};
+restoreProfile(); trackpad.update();
 element('settings').showModal();
