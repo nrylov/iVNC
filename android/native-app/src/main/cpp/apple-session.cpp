@@ -1,4 +1,4 @@
-/* Enhanced Apple 3.889 console setup, ported from owned ard/ard-patch.js and session-select.js. */
+/* Enhanced Apple 3.889 console setup, ported from archived ard/ard-patch.js (see docs/PROVENANCE.md) and session-select.js. */
 #include "native-session.h"
 #include <algorithm>
 #include <cstring>

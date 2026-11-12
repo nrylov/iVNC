@@ -32,7 +32,6 @@
     "fourStandardWheelMasksAndReleasesPipelineOn": true,
     "fourStandardWheelMasksAndReleasesPipelineOff": true
   },
-  "webViewOrNoVNCRuntimeIncluded": false,
   "realMacSession": "Owner verified accepted login and live 1920x1080 native framebuffer",
   "highPerformance": "Not yet ported",
   "appleClipboard": "Implemented encrypted Apple text clipboard; synthetic native Galaxy tests pass; actual Mac verification pending",
@@ -150,5 +149,7 @@
     "fixedBuild": "PASS flushed/finalized clipboard, oversized raw/wire payloads and malformed zlib skipped; continued exchange",
     "savedSessionRegression": "PASS",
     "realMac": "Awaiting owner confirmation; no owner clipboard inspected"
-  }
+  },
+  "usesBrowserRuntime": false,
+  "repositoryLayout": "Native only; archived implementation on codex/hybrid-reference at 130d644"
 }

@@ -26,4 +26,4 @@ sdkmanager --sdk_root="$ANDROID_HOME" 'platform-tools' 'platforms;android-35' 'b
 if [[ ! -f "$PROJECT_ROOT/.dev/debug.keystore" ]]; then
   keytool -genkeypair -keystore "$PROJECT_ROOT/.dev/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -validity 10000
 fi
-printf '\nProject-local build environment ready. Run scripts/build.sh\n'
+printf '\nProject-local build environment ready. Run scripts/bootstrap-native.sh, then scripts/build.sh\n'

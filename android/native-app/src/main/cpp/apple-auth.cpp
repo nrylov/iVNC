@@ -1,4 +1,4 @@
-/* Apple RSATunnel type 33, adapted from the protocol implemented in ard/ard-patch.js. */
+/* Apple RSATunnel type 33, adapted from the protocol implemented in archived ard/ard-patch.js (see docs/PROVENANCE.md). */
 #include "native-session.h"
 #include <vector>
 #include <cstring>

@@ -1,4 +1,4 @@
-/* Apple encrypted control records, ported from owned ard/ard-patch.js Layer 2c.
+/* Apple encrypted control records, ported from archived ard/ard-patch.js (see docs/PROVENANCE.md) Layer 2c.
  * Used for the native session channel; HP media will use its separate SRTP path. */
 package dev.ivnc.nativeclient;
 

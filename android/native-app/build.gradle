@@ -1,4 +1,4 @@
-// Independent native experiment: no WebView, JavaScript assets or noVNC dependency.
+// Native application with LibVNCClient and an original Android UI.
 plugins { id 'com.android.application' }
 android {
     namespace 'dev.ivnc.nativeclient'

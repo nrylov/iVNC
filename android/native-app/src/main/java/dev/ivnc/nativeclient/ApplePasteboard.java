@@ -1,4 +1,4 @@
-/* UTF-8 Apple pasteboard framing, ported from owned ard/ard-patch.js clipboard helpers. */
+/* UTF-8 Apple pasteboard framing, ported from archived ard/ard-patch.js (see docs/PROVENANCE.md) clipboard helpers. */
 package dev.ivnc.nativeclient;
 
 import java.io.ByteArrayOutputStream;

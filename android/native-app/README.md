@@ -1,14 +1,13 @@
-# iVNC Native experiment
+# iVNC Native
 
 Standalone Android client using the pinned LibVNCClient core. Own Java Views UI (password input explicitly masked),
 C++ socket/protocol/framebuffer path, and platform Java cryptography for Apple's
-RSA type-33 login. No WebView, JavaScript, noVNC or AVNC app/UI code is packaged.
+RSA type-33 login. The app packages a direct native renderer and its own Java Views UI.
 
-Package `dev.ivnc.nativeclient` installs alongside the working hybrid client.
-This first experiment implements Standard RFB rendering and relative mouse
-input, plus two-finger scrolling and two-finger tap to right-click. Encrypted Apple text clipboard, secure profile persistence and app-return
+Package `dev.ivnc.nativeclient` provides Standard RFB rendering and relative
+mouse input, plus two-finger scrolling and two-finger tap to right-click. Encrypted Apple text clipboard, secure profile persistence and app-return
 reconnection are implemented in 0.15. Apple High Performance remains pending.
-It is not feature-equivalent to the working client and is not a release candidate.
+High Performance implementation and owner validation are required before release.
 
 Build using existing project-local tools:
 
@@ -62,11 +61,10 @@ clipboard contents, screen recording or session keys appear in this test.
 
 New native-app code is offered under GPL-3.0-or-later (see LICENSE), using
 LibVNCClient under GPL-2.0-or-later. The original protocol implementation/reference
-under `ard/` retains its MPL-2.0 notices; this native implementation uses Android
+archived on `codex/hybrid-reference` retains its MPL-2.0 notices; this native implementation uses Android
 crypto rather than copying its JavaScript runtime. LibVNCClient's notice is also
 packaged in APK assets. Keep component attribution and source/build recipes with
-any eventual native release. The existing hybrid app remains under its original
-component licenses.
+any eventual native release. The archived implementation retains its original component licenses.
 
 ## Performance investigation
 

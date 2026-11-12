@@ -1,4 +1,4 @@
-/* Bounded Apple plain-text pasteboard transport, ported from owned ard/ard-patch.js. */
+/* Bounded Apple plain-text pasteboard transport, ported from archived ard/ard-patch.js (see docs/PROVENANCE.md). */
 #include "native-session.h"
 #include <zlib.h>
 #include <algorithm>

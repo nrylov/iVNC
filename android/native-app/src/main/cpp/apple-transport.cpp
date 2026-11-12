@@ -1,4 +1,4 @@
-/* Apple encrypted TCP control transport, matching owned ard/ard-patch.js Layer 2c.
+/* Apple encrypted TCP control transport, matching archived ard/ard-patch.js (see docs/PROVENANCE.md) Layer 2c.
  * Raw library buffering stays below the record boundary, including prefetched ciphertext. */
 #include "native-session.h"
 #include <algorithm>

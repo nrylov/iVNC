@@ -1,4 +1,4 @@
-/* Standard RFB engine and direct Android framebuffer presentation, without WebView/noVNC. */
+/* Standard RFB engine and direct Android framebuffer presentation, using direct native rendering. */
 #include "native-session.h"
 #include <android/native_window_jni.h>
 #include <sys/socket.h>

@@ -1,6 +1,4 @@
 #!/bin/bash
-# Build with project-local SDK, JDK, cache, and debug signing key.
+# Build the native client using this project's isolated Android environment.
 set -euo pipefail
-source "$(dirname "$0")/env.sh"
-"$PROJECT_ROOT/scripts/build-video.sh"
-exec gradle --no-daemon -p "$PROJECT_ROOT/android" :app:assembleDebug "$@"
+exec "$(dirname "$0")/build-native-client.sh" "$@"
