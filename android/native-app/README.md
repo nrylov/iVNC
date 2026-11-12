@@ -151,3 +151,18 @@ cumulative `ui_transform_applied` and `ui_transform_skipped` work counts. Device
 regression verifies 2000 repeated pointer updates add no transforms or cursor
 redraws while pinch still changes the actual texture Matrix. Actual Mac speed
 impact awaits owner feedback; this does not close the missing Apple HP path.
+
+
+## Apple enhanced session preview (0.12)
+
+Normal connections now use Apple's 3.889 console-session setup, encrypted control
+records and AutoFBUpdate server-pushed updates. **Compatibility mode** in the
+connection dialog restores the previous 3.8 request-driven connection. Pipeline
+comparison applies to compatibility sessions; enhanced sessions use push updates.
+Zero-size startup waits for display metadata before requesting a real-sized frame.
+The pixel codec remains ZRLE/standard fallback; Apple MVS/Thousands are pending.
+
+Host independent cipher vectors and real Galaxy synthetic encrypted session/input
+and geometry tests pass. The real Mac 3.889 public-key probe passes without sending
+credentials. Full live Mac enhanced rendering and performance await owner feedback.
+This is the setup/control foundation for HP, not a High Performance implementation.

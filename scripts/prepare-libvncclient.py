@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parent.parent
 SOURCE=ROOT/'third_party/libvncserver'
 OUTPUT=ROOT/'.dev/libvncclient-source'
 REVISION='98aaee0560baa0332339b2ef464ea96ed9b9b28c'
-PATCH='socket-idle-rsa33-control-v5'
+PATCH='socket-idle-rsa33-apple-session-v6'
 identity=REVISION+' '+PATCH
 if subprocess.check_output(['git','-C',str(SOURCE),'rev-parse','HEAD'],text=True).strip()!=REVISION:
     raise SystemExit('LibVNCClient revision differs from the reviewed pin')
@@ -78,10 +78,38 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     tail='    if (!SendIncrementalFramebufferUpdateRequest(client))\n      return FALSE;'
     assert source.count(tail)==1
     source=source.replace(tail,'    if (!requestWasPipelined && ivncContinueUpdates(client) && !SendIncrementalFramebufferUpdateRequest(client))\n      return FALSE;')
-    source=source.replace('extern void ivncAuthenticationResult(rfbClient*, uint32_t);','extern int ivncContinueUpdates(rfbClient*);\nextern int ivncAppleRectangle(rfbClient*, unsigned);\nextern int ivncPipelineUpdates(rfbClient*);\nextern void ivncAuthenticationResult(rfbClient*, uint32_t);')
+    source=source.replace('extern void ivncAuthenticationResult(rfbClient*, uint32_t);','extern int ivncContinueUpdates(rfbClient*);\nextern int ivncAppleRectangle(rfbClient*, unsigned,int,int,int,int);\nextern int ivncPipelineUpdates(rfbClient*);\nextern void ivncAuthenticationResult(rfbClient*, uint32_t);')
     rectangle='      if (rect.encoding == rfbEncodingXCursor ||'
     assert source.count(rectangle)==1
-    source=source.replace(rectangle,'      {int apple = ivncAppleRectangle(client, rect.encoding); if(apple < 0) return FALSE; if(apple > 0) continue;}\n\n'+rectangle)
+    source=source.replace(rectangle,'      {int apple = ivncAppleRectangle(client, rect.encoding, rect.r.x, rect.r.y, rect.r.w, rect.r.h); if(apple < 0) return FALSE; if(apple > 0) continue;}\n\n'+rectangle)
+    declarations='extern int ivncAppleVersion(rfbClient*,int,int);\nextern int ivncAppleClientInit(rfbClient*,int);\nextern int ivncAppleServerInit(rfbClient*);\nextern int ivncAppleMessage(rfbClient*,unsigned);\nextern int ivncAppleEncodings(rfbClient*,uint32_t*,int,int);\n'
+    source=declarations+source
+    version='  sprintf(pv,rfbProtocolVersionFormat,client->major,client->minor);'
+    assert source.count(version)==1
+    source=source.replace(version,'  if (!ivncAppleVersion(client,major,minor)) return FALSE;\n'+version)
+    source=source.replace('  ci.shared = (client->appData.shareDesktop ? 1 : 0);','  ci.shared = ivncAppleClientInit(client, (client->appData.shareDesktop ? 1 : 0));')
+    initialized='  client->desktopName[client->si.nameLength] = 0;'
+    assert source.count(initialized)==1
+    source=source.replace(initialized,initialized+'\n  if (!ivncAppleServerInit(client)) return FALSE;')
+    beforeLength='  len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;'
+    assert source.count(beforeLength)==1
+    source=source.replace(beforeLength,'  se->nEncodings = ivncAppleEncodings(client,encs,se->nEncodings,MAX_ENCODINGS);\n'+beforeLength)
+    message='  switch (msg.type) {'
+    assert source.count(message)==1
+    source=source.replace(message,'  { int apple = ivncAppleMessage(client,msg.type); if(apple < 0) return FALSE; if(apple > 0) return TRUE; }\n'+message)
+    # Declarations require the public types, which are available below upstream includes.
+    source=source.removeprefix(declarations)
+    source=source.replace('rfbBool\nInitialiseRFBConnection(',declarations+'\nrfbBool\nInitialiseRFBConnection(',1)
+    path.write_text(source)
+    path=OUTPUT/'src/libvncclient/vncviewer.c'
+    source=path.read_text()
+    signature='rfbBool rfbClientInitialise(rfbClient* client) {'
+    assert source.count(signature)==1
+    source=source.replace(signature,'extern int ivncAppleSetupBefore(rfbClient*);\nextern int ivncAppleSetupAfter(rfbClient*);\nextern int ivncAppleInitialRequest(rfbClient*);\n'+signature)
+    source=source.replace('  if (!SetFormatAndEncodings(client))','  if (!ivncAppleSetupBefore(client)) return FALSE;\n  if (!SetFormatAndEncodings(client))',1)
+    scale='  if (client->appData.scaleSetting>1)'
+    assert source.count(scale)==1
+    source=source.replace(scale,'  if (!ivncAppleSetupAfter(client)) return FALSE;\n  if (!ivncAppleInitialRequest(client)) return TRUE;\n'+scale)
     path.write_text(source)
     marker.write_text(identity)
 print('LibVNCClient '+identity+' prepared in project-local .dev')

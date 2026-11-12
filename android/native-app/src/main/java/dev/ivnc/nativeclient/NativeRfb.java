@@ -11,6 +11,7 @@ final class NativeRfb {
     static native void run(long handle,String host,int port,String username,String password,Surface surface);
     static native void stop(long handle);
     static native void destroy(long handle);
+    static native void enhanced(long handle,boolean enabled);
     static native void encryption(long handle,boolean enabled);
     static native void pipeline(long handle,boolean enabled);
     static native void wheel(long handle,int x,int y,int mask);

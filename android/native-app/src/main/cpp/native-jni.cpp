@@ -37,3 +37,7 @@ extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_wheel(JNI
 extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_encryption(JNIEnv*,jclass,jlong handle,jboolean enabled){
     if(handle)reinterpret_cast<NativeSession*>(handle)->encryptionRequested=(enabled==JNI_TRUE);
 }
+
+extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_enhanced(JNIEnv*,jclass,jlong handle,jboolean enabled){
+    if(handle)reinterpret_cast<NativeSession*>(handle)->enhancedRequested=(enabled==JNI_TRUE);
+}

@@ -25,6 +25,9 @@ void protocolLog(const char* format,...){
 }
 NativeSession* owner(rfbClient* client){return static_cast<NativeSession*>(rfbClientGetClientData(client,nullptr));}
 rfbBool allocate(rfbClient* client){
+    if((client->width<1||client->height<1)&&owner(client)->appleProtocol){
+        owner(client)->awaitingGeometry=true;client->width=client->height=1;
+    }
     if(client->width<1||client->height<1||client->width>4096||client->height>4096||int64_t(client->width)*client->height>8388608){
         char error[128];snprintf(error,sizeof(error),"Unsupported native framebuffer size: %d x %d",client->width,client->height);
         owner(client)->emit("error",error);return FALSE;
@@ -34,12 +37,12 @@ rfbBool allocate(rfbClient* client){
     return client->frameBuffer?TRUE:FALSE;
 }
 void updated(rfbClient* client,int,int,int width,int height){if(width>0&&height>0)owner(client)->frameDirty=true;}
-void finished(rfbClient* client){auto* session=owner(client);if(!finishAppleEncryption(session)){session->emit("error","Apple encryption transition failed");session->running=false;return;}if(session->frameDirty){session->present();session->frameDirty=false;}}
+void finished(rfbClient* client){auto* session=owner(client);if(!finishAppleEncryption(session)||!finishAppleDisplay(session)){session->emit("error","Apple encryption transition failed");session->running=false;return;}if(session->frameDirty){session->present();session->frameDirty=false;}}
 rfbBool cursorPosition(rfbClient* client,int x,int y){
     char position[64];snprintf(position,sizeof(position),"%d,%d",x,y);owner(client)->emit("cursor",position);return TRUE;
 }
 }
-extern "C" int ivncPipelineUpdates(rfbClient* client){auto* s=owner(client);return s->pipelineUpdates&&(!s->encryptionRequested||s->encryptionActive)?1:0;}
+extern "C" int ivncPipelineUpdates(rfbClient* client){auto* s=owner(client);return !s->pushUpdates&&s->pipelineUpdates&&(!s->encryptionRequested||s->encryptionActive)?1:0;}
 extern "C" void ivncAuthenticationResult(rfbClient* client, uint32_t result) {
     auto* session=owner(client);
     session->authenticationResult=static_cast<int>(result);
@@ -83,15 +86,18 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
         }
         else {
             emit("status","Native standard VNC connected; Apple extensions pending");
-            emit("status",pipelineUpdates?"Update requests pipelined before framebuffer decoding":"Update requests sent after framebuffer decoding");
-            if(encryptionRequested){
+            emit("status",pushUpdates?"Apple server-pushed framebuffer updates active":pipelineUpdates?"Update requests pipelined before framebuffer decoding":"Update requests sent after framebuffer decoding");
+            if(encryptionRequested&&!appleProtocol){
                 const uint8_t request[]={18,0,0,1,0,1,0,1,0,0,0,1};
                 if(!WriteToRFBServer(client,reinterpret_cast<const char*>(request),sizeof(request)))running=false;
             }
             metricsAt=clockNs(CLOCK_MONOTONIC);
             while(running){
                 {std::deque<Pointer> commands;{std::lock_guard<std::mutex> guard(inputMutex);commands.swap(input);}
-                    for(const auto& p:commands)if(!SendPointerEvent(client,p.x,p.y,p.buttons)){running=false;break;}}
+                    for(const auto& p:commands){
+                        int buttons=appleProtocol?(p.buttons&~6)|((p.buttons&4)>>1)|((p.buttons&2)<<1):p.buttons;
+                        if(!SendPointerEvent(client,p.x,p.y,buttons)){running=false;break;}
+                    }}
                 uint64_t waiting=clockNs(CLOCK_MONOTONIC);
                 int ready=WaitForMessage(client,10000);
                 socketWaitNs+=clockNs(CLOCK_MONOTONIC)-waiting;
@@ -138,8 +144,8 @@ void NativeSession::reportTiming(){
     char line[320];
     // CPU includes native decode/composition/render calls. Wall includes socket
     // reads within a message; render is a subset, not an additional elapsed cost.
-    snprintf(line,sizeof(line),"frames=%ld fps=%.1f pipeline=%s handle_cpu_ms/frame=%.2f handle_wall_ms/frame=%.2f render_ms/frame=%.2f socket_wait_ms/frame=%.2f",
-        count,count/duration,pipelineUpdates?"on":"off",handleCpuNs/1e6/count,handleWallNs/1e6/count,renderWallNs/1e6/count,socketWaitNs/1e6/count);
+    snprintf(line,sizeof(line),"frames=%ld fps=%.1f pipeline=%s updates=%s handle_cpu_ms/frame=%.2f handle_wall_ms/frame=%.2f render_ms/frame=%.2f socket_wait_ms/frame=%.2f",
+        count,count/duration,pipelineUpdates?"on":"off",pushUpdates?"push":"request",handleCpuNs/1e6/count,handleWallNs/1e6/count,renderWallNs/1e6/count,socketWaitNs/1e6/count);
     emit("metrics",line);
     metricsFrames=frames;metricsAt=now;handleCpuNs=handleWallNs=renderWallNs=socketWaitNs=0;
 }

@@ -1,3 +1,37 @@
+# Enhanced Apple Standard 0.12 preview — 2026-11-12
+
+Native 0.12-native-apple-standard is built/installed/opened on Galaxy. Normal
+connection now selects Apple 3.889 and ClientInit 0xC1, bounded console Session
+Select (including pending/grant), ViewerInfo/SetMode/SetDisplay, encryption and
+AutoFBUpdate push subscription. A Compatibility mode checkbox in the connection
+dialog selects the previous 3.8 request-driven path. No HP video option yet.
+Pipeline toggle affects compatibility requests; enhanced mode uses pushed updates.
+
+Added bounded DisplayInfo/DisplayInfo2 metadata and state/tickle handlers, deferred
+zero-size startup via a placeholder allocation, and valid-sized full request once
+real geometry arrives. Advertises only implemented Apple metadata (1100/1101/
+1103/1105), keeping ZRLE/standard fallback pixel codecs. Metadata bypasses pixel
+rectangle bounds/render accounting. Middle/right mapping follows Apple ordering.
+Encryption is acknowledged only after the plaintext FBU ends; buffered encrypted
+bytes remain below the record layer. Credentials/cipher material never logged.
+Lib patch identity socket-idle-rsa33-apple-session-v6; pin unchanged.
+
+Validation: host log/gesture/viewport/cipher tests PASS; enhanced synthetic Galaxy
+ZRLE/RSA/frame/input/wheel test PASS, including Session Select pending then grant,
+initial push subscription and no redundant incremental requests. Fragmented Raw
+with zero-size ServerInit -> DisplayInfo2 -> valid-sized update PASS. Plain 3.8
+pipelined exact pixels/input regression PASS. Password/debug UI PASS after adding
+connection-mode controls. Real Mac enhanced 3.889 public-key probe PASS, explicitly
+without credentials. No full live Mac enhanced login/stream verified yet.
+
+Owner asked to connect with Compatibility unchecked, scroll ~20s, test pointer,
+and send Debug log / subjective result; use Compatibility if new setup fails.
+Continue HP integration while awaiting that result. Next: HP negotiation/plist/
+protobuf, UDP/SRTP/HEVC RTP assembly/RTCP feedback and existing native decoder.
+HP currently uses virtual sessions in the working hybrid; support that explicitly
+rather than assume physical-console HP behavior. Keep Standard fallback, working
+hybrid install and release hold. Do not claim improved FPS from synthetic checks.
+
 # Apple encrypted control transport checkpoint — 2026-11-12
 
 Owner's 0.11 log confirms the native speed gap persists when UI transform counts

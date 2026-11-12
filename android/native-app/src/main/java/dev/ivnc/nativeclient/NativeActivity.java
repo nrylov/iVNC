@@ -40,6 +40,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private NativeTrackpad trackpad;
     private boolean errorShown;
     private EditText host,port,user,password;
+    private android.widget.CheckBox compatibility;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         getWindow().setDecorFitsSystemWindows(false);
@@ -81,6 +82,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         password.setTag("native-password");
         password.setSaveEnabled(false);
         password.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+        compatibility=new android.widget.CheckBox(this);compatibility.setText("Compatibility mode");
         connectionDialog();
     }
     private void showDebugLog(){
@@ -103,12 +105,16 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         for(EditText input:new EditText[]{host,port,user,password}){
             if(input.getParent()!=null)((android.view.ViewGroup)input.getParent()).removeView(input);fields.addView(input);
         }
-        connectionPanel=new AlertDialog.Builder(this).setTitle("Connect to your Mac").setView(fields)
+        if(compatibility.getParent()!=null)((android.view.ViewGroup)compatibility.getParent()).removeView(compatibility);
+        fields.addView(compatibility);
+        android.widget.ScrollView content=new android.widget.ScrollView(this);content.addView(fields);
+        connectionPanel=new AlertDialog.Builder(this).setTitle("Connect to your Mac").setView(content)
             .setMessage("Standard mode · macOS Screen Sharing").setCancelable(true)
             .setPositiveButton("Connect",(dialog,which)->connect()).setNeutralButton("Disconnect",(dialog,which)->stop())
             .setNegativeButton("Cancel",null).create();connectionPanel.show();
     }
     private void connect(){
+        status.setVisibility(View.VISIBLE);
         if(surface==null){status.setText("Display is not ready; try Connect again");return;}
         final int selectedPort;
         try{selectedPort=Integer.parseInt(port.getText().toString());if(selectedPort<1||selectedPort>65535)throw new NumberFormatException();}
@@ -117,10 +123,10 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         if(address.isEmpty()||username.isEmpty()||secret.isEmpty()){status.setText("Enter the Mac address and login");return;}
         password.setText("");stop();
         final Surface target=surface;
-        final boolean earlyRequests=pipeline.isChecked();
+        final boolean earlyRequests=pipeline.isChecked(),enhanced=!compatibility.isChecked();
         worker.execute(()->{
             final long session;
-            synchronized(lifetime){session=NativeRfb.create((kind,value)->runOnUiThread(()->event(kind,value)));handle=session;NativeRfb.pipeline(session,earlyRequests);}
+            synchronized(lifetime){session=NativeRfb.create((kind,value)->runOnUiThread(()->event(kind,value)));handle=session;NativeRfb.pipeline(session,earlyRequests);NativeRfb.enhanced(session,enhanced);}
             try{NativeRfb.run(session,address,selectedPort,username,secret,target);}
             finally{synchronized(lifetime){if(handle==session)handle=0;NativeRfb.destroy(session);}}
         });

@@ -51,8 +51,10 @@ extern "C" rfbBool ivncWriteStream(rfbClient* client,const char* bytes,unsigned 
     }
     return TRUE;
 }
-extern "C" int ivncContinueUpdates(rfbClient* client){return !owner(client)->encryptionPending;}
-extern "C" int ivncAppleRectangle(rfbClient* client,unsigned encoding){
+extern "C" int ivncContinueUpdates(rfbClient* client){auto* s=owner(client);return !s->encryptionPending&&!s->pushUpdates;}
+extern "C" int ivncAppleMetadata(rfbClient*,unsigned,int,int,int,int);
+extern "C" int ivncAppleRectangle(rfbClient* client,unsigned encoding,int x,int y,int width,int height){
+    int metadata=ivncAppleMetadata(client,encoding,x,y,width,height);if(metadata!=0)return metadata;
     if(encoding!=1103)return 0;
     auto* s=owner(client);if(!s->encryptionRequested||s->encryptionActive||s->encryptionPending)return -1;
     uint8_t handshake[36];if(!ReadFromRFBServer(client,reinterpret_cast<char*>(handshake),sizeof(handshake)))return -1;
@@ -68,5 +70,5 @@ bool finishAppleEncryption(NativeSession* s){
     const uint8_t ack[]={18,0,0,2,0,1,0,0};
     if(!ivncWritePlain(s->client,reinterpret_cast<const char*>(ack),sizeof(ack)))return false;
     s->encryptionPending=false;s->encryptionActive=true;s->emit("status","Apple encrypted control transport active");
-    return SendIncrementalFramebufferUpdateRequest(s->client);
+    return s->pushUpdates?true:SendIncrementalFramebufferUpdateRequest(s->client);
 }

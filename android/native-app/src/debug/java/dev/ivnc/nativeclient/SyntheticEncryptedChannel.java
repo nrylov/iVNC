@@ -27,7 +27,16 @@ final class SyntheticEncryptedChannel implements AutoCloseable {
         // Both boundaries deliberately share one socket write. The library's
         // raw read buffer may already hold ciphertext when the cipher activates.
         byte[] record=peer.encode(firstFrame);if(corrupt)record[20]^=1;transition.write(record);output.write(bytes.toByteArray());output.flush();
-        require(input.readUnsignedByte()==18,"Plaintext encryption acknowledgement missing");
+        int acknowledgement=input.readUnsignedByte();
+        // Enhanced initialization may already have queued its initial full
+        // request and subscription behind SetEncryption, before the ack.
+        for(int pending=0;acknowledgement!=18&&pending<4;pending++){
+            if(acknowledgement==9){byte[] subscription=input.readNBytes(15);require(subscription.length==15&&subscription[2]==1&&subscription[12]==32&&subscription[14]==32,"Initial push subscription changed");}
+            else if(acknowledgement==3){byte[] request=input.readNBytes(9);require(request.length==9&&request[6]==32&&request[8]==32,"Invalid initial full-update dimensions");}
+            else throw new IllegalStateException("Plaintext encryption acknowledgement missing");
+            acknowledgement=input.readUnsignedByte();
+        }
+        require(acknowledgement==18,"Plaintext encryption acknowledgement missing");
         require(Arrays.equals(input.readNBytes(7),new byte[]{0,0,2,0,1,0,0}),"Encryption acknowledgement malformed");
         return new Streams(new InputStream(){
             byte[] payload=new byte[0];int offset;

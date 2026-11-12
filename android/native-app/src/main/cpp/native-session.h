@@ -16,6 +16,7 @@ struct NativeSession {
     jobject tunnel=nullptr;
     std::atomic<bool> encryptionRequested{false};
     bool encryptionPending=false,encryptionActive=false;
+    bool enhancedRequested=false,appleProtocol=false,pushUpdates=false,awaitingGeometry=false,geometryChanged=false;
     std::vector<uint8_t> decrypted;
     size_t decryptedOffset=0;
     jstring username=nullptr, password=nullptr;
@@ -44,3 +45,8 @@ void registerAppleAuth();
 
 /** Reads/writes records through the session-owned control cipher, with metadata-only errors. */
 bool finishAppleEncryption(NativeSession* session);
+
+/** Apple metadata and push subscription helpers shared by control/frame handlers. */
+bool appleAutoUpdate(NativeSession* session);
+bool appleDisplayInfo(NativeSession* session,const std::vector<uint8_t>& data,unsigned width,unsigned height);
+bool finishAppleDisplay(NativeSession* session);

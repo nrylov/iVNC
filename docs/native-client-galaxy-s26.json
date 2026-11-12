@@ -2,7 +2,7 @@
   "date": "2026-11-11",
   "package": "dev.ivnc.nativeclient",
   "libraryCommit": "98aaee0560baa0332339b2ef464ea96ed9b9b28c",
-  "localPatch": "socket-idle-rsa33-control-v5",
+  "localPatch": "socket-idle-rsa33-apple-session-v6",
   "device": "Samsung SM-S948U1",
   "nativeBuild": "PASS",
   "deviceSyntheticIntegration": {
@@ -37,7 +37,7 @@
   "highPerformance": "Not yet ported",
   "appleClipboard": "Not yet ported",
   "release": "On hold by owner until native is evaluated",
-  "appVersion": "0.11-native-render-guard",
+  "appVersion": "0.12-native-apple-standard",
   "realMacPublicKeyProbe": {
     "passed": true,
     "credentialsSent": false,
@@ -92,7 +92,7 @@
     "actualMacSpeedImpact": "Awaiting owner timing log; no measured speed gain claimed"
   },
   "nativeEncryptedControl": {
-    "exposedInViewer": false,
+    "exposedInViewer": true,
     "liveMacVerified": false,
     "independentVectors": "PASS",
     "galaxyEncryptedZrleInputWheels": "PASS",
@@ -101,5 +101,18 @@
     "corruptRecordFailsClosedWithoutFrame": "PASS",
     "plainCompatibilityRegression": "PASS",
     "purpose": "Foundation for enhanced Apple session and HP negotiation; not HP support yet"
+  },
+  "enhancedAppleStandard": {
+    "protocol": "3.889 / ClientInit 0xC1",
+    "session": "Console Session Select with pending/grant support",
+    "updates": "AutoFBUpdate push",
+    "pixelCodec": "ZRLE plus existing standard fallback codecs; MVS/Thousands pending",
+    "defaultEnabled": true,
+    "fallback": "Compatibility checkbox restores 3.8 request-driven path",
+    "syntheticGalaxySession": "PASS",
+    "fragmentedZeroSizeGeometryStartup": "PASS",
+    "realMacPublicKeyProbe": "PASS; no credentials sent",
+    "realMacFullSession": "Awaiting owner test",
+    "highPerformance": "Not implemented yet"
   }
 }

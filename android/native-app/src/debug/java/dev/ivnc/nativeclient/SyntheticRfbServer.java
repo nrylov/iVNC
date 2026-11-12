@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit;
 final class SyntheticRfbServer implements AutoCloseable {
     final ServerSocket listener;
     final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1);
-    volatile boolean verifyWheel,encrypted,encryptionActive,corruptRecord;
+    volatile boolean verifyWheel,encrypted,encryptionActive,corruptRecord,enhanced,zeroGeometry;
+    private boolean displayMetadataSent;
     private final SyntheticEncryptedChannel encryptedPeer=new SyntheticEncryptedChannel();
     private int wheelIndex;
     volatile Throwable failure;
@@ -41,7 +42,7 @@ final class SyntheticRfbServer implements AutoCloseable {
         socket=listener.accept();socket.setSoTimeout(10000);socket.setTcpNoDelay(true);
         DataInputStream input=new DataInputStream(socket.getInputStream());DataOutputStream output=new DataOutputStream(socket.getOutputStream());
         output.writeBytes("RFB 003.889\n");output.flush();
-        require(new String(input.readNBytes(12),java.nio.charset.StandardCharsets.US_ASCII).equals("RFB 003.008\n"),"Unexpected version");
+        require(new String(input.readNBytes(12),java.nio.charset.StandardCharsets.US_ASCII).equals(enhanced?"RFB 003.889\n":"RFB 003.008\n"),"Unexpected version");
         stage="security selection";output.write(new byte[]{1,33});output.flush();require(input.readUnsignedByte()==33,"Wrong security type");
         byte[] request=input.readNBytes(14);require(request.length==14&&request[3]==10&&request[6]=='R',"Invalid key request");
         stage="RSA request received";KeyPairGenerator generator=KeyPairGenerator.getInstance("RSA");generator.initialize(2048);KeyPair pair=generator.generateKeyPair();
@@ -62,14 +63,26 @@ final class SyntheticRfbServer implements AutoCloseable {
         require(zeroString(plain,0).equals("synthetic-user")&&zeroString(plain,64).equals("synthetic-password"),"Login did not round trip");
         stage="credentials verified";authenticated=true;output.writeInt(0);output.writeInt(rejectLogin?1:0);output.flush();
         if(rejectLogin){stage="authentication rejected";input.read();return;}
-        input.readUnsignedByte(); // shared flag
-        output.writeShort(32);output.writeShort(32);
+        require(input.readUnsignedByte()==(enhanced?0xc1:1),"ClientInit flags changed");
+        output.writeShort(zeroGeometry?0:32);output.writeShort(zeroGeometry?0:32);
         output.write(new byte[]{32,24,0,1,0,(byte)255,0,(byte)255,0,(byte)255,0,8,16,0,0,0});
-        byte[] name="Synthetic iVNC".getBytes(java.nio.charset.StandardCharsets.UTF_8);output.writeInt(name.length);output.write(name);output.flush();
+        byte[] name="Synthetic iVNC".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        if(enhanced){byte[] extended=new byte[name.length+22];extended[5]=4;System.arraycopy(name,0,extended,22,name.length);name=extended;}output.writeInt(name.length);output.write(name);output.flush();
+        if(enhanced){
+            ByteArrayOutputStream sessionBytes=new ByteArrayOutputStream();DataOutputStream session=new DataOutputStream(sessionBytes);
+            session.writeShort(1);session.writeInt(2);session.writeInt(0);session.writeBytes("synthetic-console");session.writeByte(0);
+            output.writeShort(sessionBytes.size());output.write(sessionBytes.toByteArray());output.flush();
+            byte[] selected=input.readNBytes(74);require(selected.length==74&&selected[1]==72&&selected[3]==1&&selected[8]==1,"Console Session Select command missing");
+            for(int status:new int[]{2,0}){output.writeShort(80);output.writeShort(1);output.writeInt(status);output.write(new byte[74]);}output.flush();
+        }
         stage="ServerInit sent";int sent=0;
         while(true){
             int type=input.readUnsignedByte();
-            if(type==0)input.readNBytes(19);
+            if(type==33){require(enhanced,"Unexpected ViewerInfo");byte[] viewer=input.readNBytes(65);require(viewer.length==65&&viewer[2]==62,"ViewerInfo framing changed");}
+            else if(type==10){require(enhanced&&java.util.Arrays.equals(input.readNBytes(3),new byte[]{0,0,1}),"SetMode changed");}
+            else if(type==13){require(enhanced&&java.util.Arrays.equals(input.readNBytes(7),new byte[]{1,0,0,0,0,0,0}),"SetDisplay changed");}
+            else if(type==9){require(enhanced,"Unexpected push subscription");byte[] subscription=input.readNBytes(15);require(subscription.length==15&&subscription[2]==1&&subscription[12]==32&&subscription[14]==32,"Push subscription region changed");}
+            else if(type==0)input.readNBytes(19);
             else if(type==2){input.readUnsignedByte();int count=input.readUnsignedShort();require(count<256,"Encoding count too large");input.readNBytes(count*4);}
             else if(type==18){
                 require(encrypted&&!encryptionActive,"Unexpected encryption request");
@@ -77,8 +90,10 @@ final class SyntheticRfbServer implements AutoCloseable {
                 ByteArrayOutputStream first=new ByteArrayOutputStream();frame(input,new DataOutputStream(first));
                 SyntheticEncryptedChannel.Streams streams=encryptedPeer.activate(aes,input,output,first.toByteArray(),corruptRecord);
                 java.util.Arrays.fill(aes,(byte)0);input=streams.input;output=streams.output;encryptionActive=true;sent=1;
+                if(enhanced){frame(input,output);sent=2;}
             }
-            else if(type==3){input.readNBytes(9);
+            else if(type==3){byte[] update=input.readNBytes(9);
+                if(enhanced&&encryptionActive)require(update.length==9&&update[0]==0,"Push session sent redundant incremental request");
                 if(encrypted&&!encryptionActive)continue;
                 if(requireAhead)require(sent==0,"Duplicate next-update request after pipelined frame");
                 if(sent++<frameLimit)frame(input,output);
@@ -93,13 +108,18 @@ final class SyntheticRfbServer implements AutoCloseable {
         }
     }
     private void frame(DataInputStream input,DataOutputStream output) throws Exception {
-        output.write(new byte[]{0,0,0,(byte)(cursorPosition?2:1)});output.flush();
+        boolean metadata=zeroGeometry&&!displayMetadataSent;displayMetadataSent|=metadata;
+        output.write(new byte[]{0,0,0,(byte)((cursorPosition?2:1)+(metadata?1:0))});output.flush();
         if(requireAhead){
             // Body deliberately waits for the next request: sending only after
             // decoding this frame would deadlock and fail this regression.
             require(input.readUnsignedByte()==3,"Expected request before framebuffer body");
             byte[] next=input.readNBytes(9);require(next.length==9&&next[0]==1,"Expected one incremental next request");
             aheadReceived=true;
+        }
+        if(metadata){
+            output.writeShort(0);output.writeShort(0);output.writeShort(32);output.writeShort(32);output.writeInt(1105);output.writeShort(20);
+            output.writeShort(1);for(int i=0;i<4;i++)output.writeShort(32);output.writeInt(1);output.writeInt(0);output.writeShort(0);
         }
         if(cursorPosition){output.writeShort(11);output.writeShort(17);output.writeShort(0);output.writeShort(0);output.writeInt(-232);}
         output.writeShort(0);output.writeShort(0);output.writeShort(32);output.writeShort(32);output.writeInt(zrle?16:0);
