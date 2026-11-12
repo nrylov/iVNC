@@ -48,23 +48,26 @@ Measure displayed frame rate and latency separately from decode-only throughput.
 A native rewrite removes bridge overhead but does not by itself guarantee a
 particular frame rate.
 
-## Current status (2026-11-11)
+## Current status (2026-11-12)
 
-Native 0.10 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
+Native 0.13 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
 Mac login, live 1920×1080 Standard updates, relative pointer input and two-finger
 scrolling. Synthetic/device regressions cover Apple RSA/AES auth, fragmented
 reads, exact native pixels, cursor, pipeline request ordering and wheel packets.
-It also has full-screen controls, native pinch zoom, pointer-follow panning and
-adjustable scroll speed; real Mac zoom feedback is pending. See HANDOFF.md and
+It also has full-screen controls, native pinch zoom, pointer-follow panning,
+adjustable scroll speed and a dedicated advanced keyboard. Owner confirmed zoom
+and much smoother enhanced Apple Standard with 3.889/push updates. Native key/IME
+regressions pass; real Mac typing feedback is pending. See HANDOFF.md and
 native-client-galaxy-s26.json for current validation and limitations.
 
 Owner's next requested milestone is High Performance. The existing hybrid has
 verified ~60+ FPS HP streaming using native FFmpeg, but the native protocol app
 still lacks its negotiation and media transport. Integration requires:
 
-1. Retain the auth AES key only for the session, then implement encrypted Apple
-   control records and enhanced 3.889 session setup. Add deterministic vectors and
-   synthetic session tests; zero keys on close and never log them.
+1. Implemented: session-scoped auth key, encrypted control records and enhanced
+   3.889 console setup with pushed Standard updates. Cipher vectors and synthetic
+   session tests pass; owner confirms live enhanced Standard. Next extend this to
+   HP virtual sessions/negotiation.
 2. Port HP offer/answer and virtual-display handling from owned ard/hp reference.
 3. Receive UDP directly, authenticate/decrypt SRTP, assemble HEVC stripes and send
    RTCP feedback. Test loss, reordering, wraparound and malformed bounded input.
@@ -73,6 +76,5 @@ still lacks its negotiation and media transport. Integration requires:
 5. Verify actual Mac streaming, stalls/recovery, Surface loss and return from
    another app on Galaxy. Preserve Standard fallback and working hybrid app.
 
-Apple clipboard, secure native profiles/reconnect and advanced keyboard are still
-pending. Release stays on hold until owner selects a base. Native architecture
+Apple clipboard and secure native profiles/reconnect are still pending. Release stays on hold until owner selects a base. Native architecture
 removes the bridge but does not by itself guarantee improved performance.

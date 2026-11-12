@@ -37,7 +37,7 @@
   "highPerformance": "Not yet ported",
   "appleClipboard": "Not yet ported",
   "release": "On hold by owner until native is evaluated",
-  "appVersion": "0.12-native-apple-standard",
+  "appVersion": "0.13-native-keyboard",
   "realMacPublicKeyProbe": {
     "passed": true,
     "credentialsSent": false,
@@ -112,7 +112,17 @@
     "syntheticGalaxySession": "PASS",
     "fragmentedZeroSizeGeometryStartup": "PASS",
     "realMacPublicKeyProbe": "PASS; no credentials sent",
-    "realMacFullSession": "Awaiting owner test",
+    "realMacFullSession": "Owner confirms much smoother live session; log shows updates=push, mostly ~80–140 Surface posts/sec and ~0.5–3ms socket wait/post. Not physical display FPS.",
     "highPerformance": "Not implemented yet"
+  },
+  "nativeKeyboard": {
+    "buttons": "Dedicated floating keyboard and separate options menu",
+    "features": "Phone typing, one-shot Ctrl/Alt/Cmd/Shift, arrows, Esc/Tab/navigation/F1–F12",
+    "transport": "Serialized atomic key batches; full tunnel or per-key auth-key encryption in compatibility mode",
+    "hostModel": "PASS",
+    "galaxyEnhancedAndCompatibilityProtectedKeyBatches": "PASS",
+    "galaxyImeCompositionAndLayout": "PASS",
+    "zoomPasswordDebugUiRegression": "PASS",
+    "actualMacTyping": "Awaiting owner test"
   }
 }

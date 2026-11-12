@@ -14,6 +14,7 @@ final class NativeRfb {
     static native void enhanced(long handle,boolean enabled);
     static native void encryption(long handle,boolean enabled);
     static native void pipeline(long handle,boolean enabled);
+    static native boolean keys(long handle,int[] events);
     static native void wheel(long handle,int x,int y,int mask);
     static native void pointer(long handle,int x,int y,int buttons);
 }

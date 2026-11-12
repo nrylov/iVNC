@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit;
 /** No real Mac login, screen contents or session secrets enter this test. */
 final class SyntheticRfbServer implements AutoCloseable {
     final ServerSocket listener;
-    final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1);
+    final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1),keyboard=new CountDownLatch(1);
+    private int keyboardIndex;
     volatile boolean verifyWheel,encrypted,encryptionActive,corruptRecord,enhanced,zeroGeometry;
     private boolean displayMetadataSent;
     private final SyntheticEncryptedChannel encryptedPeer=new SyntheticEncryptedChannel();
@@ -98,6 +99,13 @@ final class SyntheticRfbServer implements AutoCloseable {
                 if(requireAhead)require(sent==0,"Duplicate next-update request after pipelined frame");
                 if(sent++<frameLimit)frame(input,output);
             }
+            else if(type==4){
+                require(encryptionActive,"Unprotected key event sent on Apple session");int down=input.readUnsignedByte();input.readUnsignedShort();verifyKey(input.readInt(),down!=0);
+            }
+            else if(type==16){
+                require(!encryptionActive&&input.readUnsignedByte()==0,"Unexpected per-key encryption event");byte[] protectedKey=input.readNBytes(16);require(protectedKey.length==16,"Truncated key event");
+                byte[] keyEvent=cipher.doFinal(protectedKey);require((keyEvent[0]&255)==255,"Invalid encrypted key marker");verifyKey(java.nio.ByteBuffer.wrap(keyEvent).getInt(2),keyEvent[1]!=0);
+            }
             else if(type==5){int buttons=input.readUnsignedByte(),x=input.readUnsignedShort(),y=input.readUnsignedShort();
                 require(x==11&&y==17,"Pointer coordinates changed");
                 if(verifyWheel){int[] expected={0,8,0,16,0,32,0,64,0};
@@ -106,6 +114,11 @@ final class SyntheticRfbServer implements AutoCloseable {
                 }else require(buttons==0,"Pointer buttons changed");pointer.countDown();}
             else throw new IllegalStateException("Unexpected client message "+type);
         }
+    }
+    private void verifyKey(int symbol,boolean down){
+        int[] expected={0xffe3,0x63,-0x63,-0xffe3,0x010003c0,-0x010003c0,0xff08,-0xff08};
+        require(keyboardIndex<expected.length&&(down?symbol:-symbol)==expected[keyboardIndex++],"Keyboard press/release ordering changed");
+        if(keyboardIndex==expected.length)keyboard.countDown();
     }
     private void frame(DataInputStream input,DataOutputStream output) throws Exception {
         boolean metadata=zeroGeometry&&!displayMetadataSent;displayMetadataSent|=metadata;

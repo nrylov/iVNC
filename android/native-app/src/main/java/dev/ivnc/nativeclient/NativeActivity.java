@@ -25,6 +25,8 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private long handle;
     private TextureView texture;
     private ViewportRenderer renderer;
+    private KeyboardDock keyboardDock;
+    private int keyboardReserved;
     private final DesktopViewport viewport=new DesktopViewport();
     private CursorOverlay cursor;
     private android.widget.ToggleButton pipeline;
@@ -60,7 +62,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             synchronized(lifetime){if(handle!=0)NativeRfb.pipeline(handle,enabled);}
             debugLog.add("status","Update request pipeline "+(enabled?"enabled":"disabled")+" for subsequent updates");
         });
-        ViewerControls.attach(this,root,()->(connected?"Connected":"Disconnected")+" · "+Math.round(viewport.zoom()*100)+"%",pipeline::isChecked,this::viewerAction);
+        ViewerControls.attach(this,root,()->(connected?"Connected":"Disconnected")+" · "+Math.round(viewport.zoom()*100)+"%",pipeline::isChecked,()->keyboardReserved,this::viewerAction);
         trackpad=new NativeTrackpad(getResources().getDisplayMetrics().density,new NativeTrackpad.Output(){
             public void move(float dx,float dy){
                 float scale=Math.max(.01f,viewport.scale());
@@ -74,6 +76,13 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             public void wheel(int mask){synchronized(lifetime){if(handle!=0)NativeRfb.wheel(handle,(int)cursorX,(int)cursorY,mask);}}
         });
         trackpad.setScrollSpeed(ScrollSettings.savedSpeed(this));
+        keyboardDock=new KeyboardDock(this,root,new NativeKeyboard(events->{
+            synchronized(lifetime){return connected&&handle!=0&&NativeRfb.keys(handle,events);}
+        }),bottom->{
+            keyboardReserved=Math.min(bottom,Math.max(0,root.getHeight()-(int)(72*getResources().getDisplayMetrics().density)));ViewerControls.reserved(root,keyboardReserved);
+            int margin=Math.min(bottom,Math.max(0,root.getHeight()-64));
+            for(View viewer:new View[]{texture,cursor}){FrameLayout.LayoutParams layout=(FrameLayout.LayoutParams)viewer.getLayoutParams();if(layout.bottomMargin!=margin){layout.bottomMargin=margin;viewer.setLayoutParams(layout);}}
+        });
         texture.setOnTouchListener(this::touch);
         setContentView(root);root.post(()->ViewerControls.immersive(this));
         host=field("Mac address",InputType.TYPE_CLASS_TEXT);port=field("Port",InputType.TYPE_CLASS_NUMBER);port.setText("5900");
@@ -155,6 +164,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     }
     private void viewerAction(String action){
         switch(action){
+            case "keyboard":keyboardDock.toggle();break;
             case "connection":connectionDialog();break;
             case "log":showDebugLog();break;
             case "pipeline":pipeline.setChecked(!pipeline.isChecked());break;
@@ -168,7 +178,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
                 .setPositiveButton("Done",null).show();break;
         }
     }
-    private void fit(){viewport.resize(texture.getWidth(),texture.getHeight(),width,height);applyViewport();}
+    private void fit(){viewport.resize(texture.getWidth(),texture.getHeight(),width,height);viewport.follow(cursorX,cursorY);applyViewport();}
     private void applyViewport(){renderer.apply(viewport);updateCursor();}
     private void updateCursor(){cursor.position(width,height,cursorX,cursorY);}
     private boolean touch(View view,MotionEvent event){
@@ -185,7 +195,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         return true;
     }
     private void pointer(int buttons){lastLocalPointerAt=android.os.SystemClock.uptimeMillis();viewport.follow(cursorX,cursorY);applyViewport();synchronized(lifetime){if(handle!=0)NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons);}}
-    private void stop(){connected=false;touchActive=false;if(trackpad!=null)trackpad.cancel();if(cursor!=null)cursor.setVisibility(View.INVISIBLE);synchronized(lifetime){if(handle!=0)NativeRfb.stop(handle);}}
+    private void stop(){if(keyboardDock!=null)keyboardDock.clear();connected=false;touchActive=false;if(trackpad!=null)trackpad.cancel();if(cursor!=null)cursor.setVisibility(View.INVISIBLE);synchronized(lifetime){if(handle!=0)NativeRfb.stop(handle);}}
     @Override public void onSurfaceTextureAvailable(SurfaceTexture value,int width,int height){surface=new Surface(value);fit();}
     @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture value){stop();if(surface!=null)surface.release();surface=null;return true;}
     @Override public void onSurfaceTextureSizeChanged(SurfaceTexture value,int width,int height){fit();}

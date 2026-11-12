@@ -41,6 +41,8 @@ public final class NativeIntegrationInstrumentation extends Instrumentation {
             for(int mask:new int[]{8,16,32,64})NativeRfb.wheel(handle,11,17,mask);
             require(server.wheel.await(5,TimeUnit.SECONDS),"Native wheel press/release messages missing: "+server.failure);
             require(!encrypted||server.encryptionActive,"Encrypted channel did not activate");
+            require(NativeRfb.keys(handle,new int[]{0xffe3,0x63,-0x63,-0xffe3,0x010003c0,-0x010003c0,0xff08,-0xff08}),"Native keyboard batch rejected");
+            require(server.keyboard.await(5,TimeUnit.SECONDS),"Native protected keyboard batch missing: "+server.failure);
             Image image=null;
             for(int attempt=0;attempt<100&&image==null;attempt++){image=images.acquireLatestImage();if(image==null)Thread.sleep(5);}
             require(image!=null,"Surface pixel buffer unavailable");
@@ -53,7 +55,7 @@ public final class NativeIntegrationInstrumentation extends Instrumentation {
             }finally{image.close();}
             require(failure.get()==null,"Native failure: "+failure.get());
             NativeRfb.stop(handle);connection.join(7000);require(!connection.isAlive(),"Native stop did not release socket worker");
-            result.putString("stream","PASS: encoding="+(zrle?"ZRLE":"Raw")+"; enhanced="+enhanced+"; deferred geometry="+zeroGeometry+"; encrypted="+encrypted+"; pipeline="+pipeline+"; ahead verified="+ahead+"; cursor position verified; fragmented="+fragmented+"; RSA key wrapper " + (wrappedKey?"SPKI":"PKCS1") + "; real LibVNCClient, Apple type-33 RSA/AES login, exact RGBA Surface pixels, queued pointer, four wheel press/release pairs and cancellation. No WebView/noVNC.");
+            result.putString("stream","PASS: encoding="+(zrle?"ZRLE":"Raw")+"; enhanced="+enhanced+"; deferred geometry="+zeroGeometry+"; encrypted="+encrypted+"; pipeline="+pipeline+"; ahead verified="+ahead+"; cursor position verified; fragmented="+fragmented+"; RSA key wrapper " + (wrappedKey?"SPKI":"PKCS1") + "; real LibVNCClient, Apple type-33 RSA/AES login, exact RGBA Surface pixels, queued pointer, four wheel press/release pairs, protected keyboard batch and cancellation. No WebView/noVNC.");
             finish(Activity.RESULT_OK,result);
         }catch(Throwable error){result.putString("stream","NATIVE INTEGRATION FAILED: "+error);finish(Activity.RESULT_CANCELED,result);}
         finally{if(handle!=0){NativeRfb.stop(handle);try{if(connection!=null)connection.join(7000);}catch(InterruptedException ignored){}if(connection==null||!connection.isAlive())NativeRfb.destroy(handle);}}

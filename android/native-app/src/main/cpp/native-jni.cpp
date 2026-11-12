@@ -41,3 +41,13 @@ extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_encryptio
 extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_enhanced(JNIEnv*,jclass,jlong handle,jboolean enabled){
     if(handle)reinterpret_cast<NativeSession*>(handle)->enhancedRequested=(enabled==JNI_TRUE);
 }
+
+extern "C" JNIEXPORT jboolean JNICALL Java_dev_ivnc_nativeclient_NativeRfb_keys(JNIEnv* env,jclass,jlong handle,jintArray input){
+    if(!handle||!input)return JNI_FALSE;
+    int count=env->GetArrayLength(input);if(count<1||count>512)return JNI_FALSE;
+    std::vector<int32_t> keys(count);env->GetIntArrayRegion(input,0,count,keys.data());
+    for(int32_t event:keys){int64_t symbol=event<0?-int64_t(event):event;if(symbol<1||symbol>0x0110ffff)return JNI_FALSE;}
+    auto* session=reinterpret_cast<NativeSession*>(handle);std::lock_guard<std::mutex> guard(session->inputMutex);
+    if(!session->running||session->input.size()>=256)return JNI_FALSE;
+    NativeSession::Pointer command{};command.keys=std::move(keys);session->input.push_back(std::move(command));return JNI_TRUE;
+}

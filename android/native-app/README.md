@@ -6,7 +6,7 @@ RSA type-33 login. No WebView, JavaScript, noVNC or AVNC app/UI code is packaged
 
 Package `dev.ivnc.nativeclient` installs alongside the working hybrid client.
 This first experiment implements Standard RFB rendering and relative mouse
-input, plus two-finger scrolling and two-finger tap to right-click. Apple High Performance, Apple clipboard, keyboard extensions, secure
+input, plus two-finger scrolling and two-finger tap to right-click. Apple High Performance, Apple clipboard, secure
 profile persistence and lifecycle reconnection are not integrated here yet.
 It is not feature-equivalent to the working client and is not a release candidate.
 
@@ -166,3 +166,24 @@ Host independent cipher vectors and real Galaxy synthetic encrypted session/inpu
 and geometry tests pass. The real Mac 3.889 public-key probe passes without sending
 credentials. Full live Mac enhanced rendering and performance await owner feedback.
 This is the setup/control foundation for HP, not a High Performance implementation.
+
+
+## Dedicated keyboard (0.13)
+
+Use **⌨** for the phone keyboard and **⋮** for the other viewer options. Ctrl,
+Alt, ⌘ and Shift apply to the next key/text input and release automatically.
+Arrows stay on the main accessory row; **More** reveals Esc, Tab, navigation and
+F1–F12. **Hide** closes the keyboard. The desktop shrinks into the available space,
+and both floating buttons stay above the keyboard/accessory dock.
+
+IME composition stays local until committed; committed text is transmitted then
+cleared from the input. View-state saving and personalized IME learning are
+disabled. Key batches are serialized atomically with matching releases. Enhanced
+sessions protect key events with the full tunnel; compatibility sessions use
+Apple's per-key encrypted records. IME commits are bounded to 240 code points.
+Keyboard input is never added to the debug log.
+
+Host tests and real Galaxy synthetic IME/protected-protocol tests pass; actual
+Mac typing is awaiting owner confirmation. Owner has confirmed 0.12 enhanced
+Standard is much smoother, with mostly 80–140 posted updates/sec in their log.
+Those counts are not physical display FPS. Native HP media remains pending.

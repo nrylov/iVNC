@@ -24,6 +24,13 @@ final class AppleTunnel implements AutoCloseable {
         key=Arrays.copyOfRange(material,0,16);sendIv=Arrays.copyOfRange(material,16,32);receiveIv=sendIv.clone();
         Arrays.fill(material,(byte)0);Arrays.fill(auth,(byte)0);auth=null;sendSequence=receiveSequence=0;
     }
+    byte[] keyEvent(int symbol,boolean down)throws Exception{
+        if(auth==null||failed)throw new IllegalStateException("Apple key encryption is unavailable");
+        byte[] plain=new byte[16];plain[0]=(byte)255;plain[1]=(byte)(down?1:0);
+        ByteBuffer.wrap(plain).putInt(2,symbol).putInt(6,(int)(System.nanoTime()/1000));
+        Cipher cipher=Cipher.getInstance("AES/ECB/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,new SecretKeySpec(auth,"AES"));
+        byte[] record=new byte[18];record[0]=16;System.arraycopy(cipher.doFinal(plain),0,record,2,16);Arrays.fill(plain,(byte)0);return record;
+    }
     byte[] encode(byte[] payload)throws Exception{
         check();if(payload.length>16384)throw new IllegalArgumentException("Control write exceeds record limit");
         int size=((payload.length+22+15)/16)*16;byte[] plain=new byte[size];

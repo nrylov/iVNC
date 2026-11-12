@@ -1,3 +1,49 @@
+# Native Standard performance confirmed; dedicated keyboard — 2026-11-12
+
+Owner tested 0.12 with Compatibility unchecked: "a lot smoother". Pasted tail
+shows updates=push, mostly ~80–140 Surface posts/sec with occasional higher/lower
+batches, socket wait generally ~0.5–3ms/post versus ~20–25ms previously. These are
+posted framebuffer updates, not physical display FPS. This confirms the enhanced
+Apple session/push path materially improves the owner's experience; stop chasing
+UI transforms as the main bottleneck. Early login/encryption stages were trimmed
+from pasted tail, so do not infer a physical refresh rate or separate codec claim.
+
+Owner then requested separate keyboard and other-menu buttons. Native 0.13-native-
+keyboard is built/installed/opened. Translucent ⌨ and ⋮ buttons are separate and
+move above the IME/accessory dock. Typing uses Android InputConnection: composing
+text stays local until committed, committed text is sent then cleared, Unicode
+keysyms are used above Latin-1, Backspace/Enter handled. Input state saving and
+IME personalized learning disabled. Ctrl/Alt/⌘/Shift are one-shot local toggles:
+next key/text batch includes presses and reversed releases atomically. Arrows
+are on the main row; More reveals Esc/Tab/Enter/Backspace/navigation/F1–F12.
+Hide closes dock/IME. Viewer/cursor reserve dock+IME space and follow pointer on
+resize so controls remain visible. No native advanced keyboard existed before.
+
+Native key batches share the protocol worker/input queue, bounded to 512 events
+per batch and 256 commands, so modifiers and pointer writes cannot interleave
+mid-shortcut. Full encrypted sessions send standard key events through the tunnel;
+compatibility type-33 sessions send auth-key-protected EncryptedEvent packets.
+Neither typed text nor keysyms are logged. Committed text is limited to 240 code
+points per IME commit; large paste/clipboard support remains future work.
+
+Validation: project-local build + host keyboard/viewport/gesture/cipher/log tests
+PASS. Galaxy protocol exact-pixel/RSA/wheel/keyboard batch tests PASS for enhanced
+full encryption and compatibility per-key encryption, including Ctrl+C, Unicode
+and Backspace. Galaxy actual IME test PASS: separate production buttons, viewer/
+cursor reserve space, buttons above dock, composition/commit/finish Unicode,
+Backspace and no committed text retention. App-only PixelCopy layout reviewed;
+no real desktop/text captured. Native zoom/render-guard test PASS; password/debug
+UI regression PASS. Fixed delayed IME opening by waiting for window attachment/
+focus before requesting it. No live Mac typing verified yet.
+
+Owner asked to reconnect in 0.13, type into a blank document, test Backspace/
+arrows and ⌘ then A, and report keyboard/button convenience. Await feedback.
+Native High Performance remains the next requested major milestone. Its Apple
+setup/encrypted-control foundation is in place; HP negotiation/virtual session,
+UDP/SRTP/RTP/feedback and linking the existing decoder remain. No HP UI or live
+HP transport exists in native yet. Working hybrid remains installed, no noVNC
+runtime in native. GitHub release remains explicitly ON HOLD until base chosen.
+
 # Enhanced Apple Standard 0.12 preview — 2026-11-12
 
 Native 0.12-native-apple-standard is built/installed/opened on Galaxy. Normal

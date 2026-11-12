@@ -27,7 +27,7 @@ struct NativeSession {
     bool frameDirty=false;
     std::atomic<int> socket{-1};
     std::mutex inputMutex;
-    struct Pointer {int x,y,buttons;};
+    struct Pointer {int x,y,buttons;std::vector<int32_t> keys;};
     std::deque<Pointer> input;
     long frames=0, metricsFrames=0;
     uint64_t metricsAt=0, handleCpuNs=0, handleWallNs=0, renderWallNs=0, socketWaitNs=0;
@@ -50,3 +50,6 @@ bool finishAppleEncryption(NativeSession* session);
 bool appleAutoUpdate(NativeSession* session);
 bool appleDisplayInfo(NativeSession* session,const std::vector<uint8_t>& data,unsigned width,unsigned height);
 bool finishAppleDisplay(NativeSession* session);
+
+/** Sends a complete keyboard batch without interleaving pointer or modifier transitions. */
+bool sendKeyboard(NativeSession* session,const std::vector<int32_t>& keys);

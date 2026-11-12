@@ -95,6 +95,7 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
             while(running){
                 {std::deque<Pointer> commands;{std::lock_guard<std::mutex> guard(inputMutex);commands.swap(input);}
                     for(const auto& p:commands){
+                        if(!p.keys.empty()){if(!sendKeyboard(this,p.keys)){running=false;break;}continue;}
                         int buttons=appleProtocol?(p.buttons&~6)|((p.buttons&4)>>1)|((p.buttons&2)<<1):p.buttons;
                         if(!SendPointerEvent(client,p.x,p.y,buttons)){running=false;break;}
                     }}
