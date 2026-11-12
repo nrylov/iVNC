@@ -45,7 +45,7 @@ final class ClipboardSync {
     }
     void request(){if(!ready||!focused){notice.accept("Clipboard needs a connected Apple session");return;}transport.send(2,null);}
     void phone(boolean explicit){
-        if(!ready||!focused)return;
+        if(!ready||!focused){if(explicit)notice.accept("Clipboard needs a connected Apple session");return;}
         try{
             CharSequence text=port.read();if(text==null){if(explicit)notice.accept("Phone clipboard has no text");return;}
             byte[] digest=MessageDigest.getInstance("SHA-256").digest(text.toString().getBytes(StandardCharsets.UTF_8));

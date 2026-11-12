@@ -1,4 +1,67 @@
-# RESTART CHECKPOINT: saved sessions / refresh / clipboard WIP — 2026-11-12
+# Native 0.15 saved sessions, clipboard and initial refresh — 2026-11-12
+
+Current checkpoint: milestone implemented, built and installed on Galaxy as
+0.15-native-sessions-clipboard. Source validated on wip/native-sessions-clipboard
+and ready for main. The older restart checkpoint below is historical.
+Repository: /Users/nikolairylov/Repositories/iVNC (nrylov/iVNC); do not edit newserver.
+Release remains ON HOLD until owner chooses native vs hybrid. No release/tag/APK
+publication is authorized yet. Single-agent workflow; keep working hybrid intact.
+
+Changes:
+- Request a complete framebuffer after encrypted control activation/display
+  metadata, with one delayed retry and a manual Refresh desktop action. Synthetic
+  server starts with partial black areas: exact complete pixels now arrive without
+  pointer input. Actual Mac startup fix still needs owner verification.
+- Remember one connection, including auth, with AES-256-GCM Android Keystore
+  encryption. Save only after first frame; never populate password text controls
+  with saved credentials. Forget removes encrypted data/key. Unreadable profiles
+  retain a visible Forget action. Ordered storage operations prevent stale saves.
+- App pause stops the session; return with a valid Surface reconnects using retained
+  details. Saved resume intent also supports process recreation. Manual Disconnect
+  or authentication/permission rejection disables automatic return. Epoch guards
+  reject stale callbacks and worker owns Surface teardown. No continuous foreground
+  retry loop. Temporary 1x1 display allocations no longer reset reconnect zoom.
+- Bidirectional Apple text clipboard through encrypted commands, zlib and bounded
+  UTF-8 pasteboard parsing (1MiB). Automatic sync only while focused; changed phone
+  text after returning takes priority over initial Mac sync. Echo fingerprints and
+  explicit Get Mac clipboard / Send phone clipboard actions. Requires enhanced
+  Apple mode; unavailable in Compatibility mode. Clipboard payloads never logged.
+
+Validation (project-local tools):
+- Build PASS; scripts/test-native-log.sh PASS (clipboard bounds/echo/background
+  behavior plus existing log, gesture, viewport, cipher, keyboard and drag tests).
+- Galaxy SessionFeaturesInstrumentation PASS: exact initially partial image becomes
+  complete without pointer input, delayed encrypted refresh, native UTF-8 clipboard
+  in both directions, clipboard session IDs and state-change/data-needed handling.
+- Galaxy SavedSessionInstrumentation PASS: encrypted remembered login, password
+  absent from text controls, pause/resume with zoom preserved including zero-size
+  startup, stale-callback protection, Activity recreation auto-login, manual stop,
+  Forget, rejected-login resume suppression and unreadable-profile Forget recovery.
+- Native ProfileStoreInstrumentation PASS: Keystore roundtrip, fresh IV, tamper
+  rejection and deletion. Keyboard, viewer/zoom/render guard, password, cursor and
+  compatibility ZRLE protocol/input/drag regressions PASS after controller changes.
+- Device tests use fake credentials, loopback peers, separate test prefs/key aliases
+  and an in-memory clipboard. No owner credentials, screen or clipboard inspected.
+  Only app-owned synthetic PixelCopy captures are safe; no whole-display capture.
+
+Next owner test: connect once with Remember connection securely enabled; check
+that initial image is complete, switch away/back, reopen after closing, then copy
+plain text in each direction (explicit menu actions available). Native profile is
+separate from the hybrid app. Owner already confirmed 0.14 drag/selection works.
+Do not claim actual Mac 0.15 verification until their response.
+
+Next engineering milestone: native High Performance negotiation/media transport,
+reusing the existing owned decoder and hybrid protocol reference. Native enhanced
+Standard already owner-confirmed much smoother (~80–140 Surface posts/sec, NOT
+physical display FPS). Keep tests focused and preserve Standard fallback.
+
+ADB: scripts/device.sh uses dedicated server 5048. Galaxy selector
+adb-RFGL123YQQH-F5OiYw._adb-tls-connect._tcp; latest endpoint 192.168.50.27:34857.
+Project SDK/JDK/NDK/caches live in .dev; ~/.android keys owner-approved. Current
+permissions are unrestricted/approval never: omit sandbox_permissions entirely.
+Do not operate Mac GUI while another agent may be using it.
+
+# Historical restart checkpoint: saved sessions / refresh / clipboard WIP — 2026-11-12
 
 Owner needs to restart Codex. This is a deliberate source checkpoint, not a
 finished feature release. Active repository is /Users/nikolairylov/Repositories/iVNC

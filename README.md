@@ -39,7 +39,9 @@ not two complete VNC clients.
 ## Native experiment
 
 `android/native-app` is a separate LibVNCClient-based Android app with its own
-native protocol/render path and Android UI. See [native experiment status](android/native-app/README.md).
+native protocol/render path and Android UI. Native 0.15 includes fullscreen zoom,
+advanced keyboard, drag selection, encrypted saved login, app-return reconnect and
+Apple text clipboard. High Performance remains pending in this variant. See [native experiment status](android/native-app/README.md).
 It is not yet equivalent to the working Apple High Performance client. GitHub
 APK release is on hold until the owner compares the variants and chooses a base.
 

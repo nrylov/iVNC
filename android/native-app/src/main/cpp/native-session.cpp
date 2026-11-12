@@ -33,7 +33,8 @@ rfbBool allocate(rfbClient* client){
         owner(client)->emit("error",error);return FALSE;
     }
     free(client->frameBuffer);client->frameBuffer=static_cast<uint8_t*>(calloc(size_t(client->width)*client->height,4));
-    char geometry[64];snprintf(geometry,sizeof(geometry),"%d,%d",client->width,client->height);owner(client)->emit("size",geometry);
+    if(owner(client)->awaitingGeometry)owner(client)->emit("status","Waiting for Mac display geometry");
+    else {char geometry[64];snprintf(geometry,sizeof(geometry),"%d,%d",client->width,client->height);owner(client)->emit("size",geometry);}
     return client->frameBuffer?TRUE:FALSE;
 }
 void updated(rfbClient* client,int,int,int width,int height){if(width>0&&height>0)owner(client)->frameDirty=true;}

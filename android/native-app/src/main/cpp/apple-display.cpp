@@ -8,6 +8,7 @@ bool geometry(NativeSession* s,unsigned width,unsigned height){
     if(width>4096||height>4096||uint64_t(width)*height>8388608)return false;
     if(!s->awaitingGeometry&&width==unsigned(s->client->width)&&height==unsigned(s->client->height))return true;
     auto* c=s->client;c->width=width;c->height=height;
+    s->awaitingGeometry=false; // The UI must see real dimensions, not the temporary 1x1 allocation.
     if(!c->MallocFrameBuffer(c))return false;
     c->updateRect.x=c->updateRect.y=0;c->updateRect.w=width;c->updateRect.h=height;
     s->awaitingGeometry=false;s->geometryChanged=true;return true;

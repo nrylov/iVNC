@@ -6,8 +6,8 @@ RSA type-33 login. No WebView, JavaScript, noVNC or AVNC app/UI code is packaged
 
 Package `dev.ivnc.nativeclient` installs alongside the working hybrid client.
 This first experiment implements Standard RFB rendering and relative mouse
-input, plus two-finger scrolling and two-finger tap to right-click. Apple High Performance, Apple clipboard, secure
-profile persistence and lifecycle reconnection are not integrated here yet.
+input, plus two-finger scrolling and two-finger tap to right-click. Encrypted Apple text clipboard, secure profile persistence and app-return
+reconnection are implemented in 0.15. Apple High Performance remains pending.
 It is not feature-equivalent to the working client and is not a release candidate.
 
 Build using existing project-local tools:
@@ -19,7 +19,7 @@ Build using existing project-local tools:
 
 The wrapper prepares an ignored `.dev/libvncclient-source` copy at upstream commit
 `98aaee0560baa0332339b2ef464ea96ed9b9b28c`, then applies the small exact-read patch
-in `scripts/prepare-libvncclient.py` (patch identity `socket-idle-rsa33-pipeline-v4`). The checked-in submodule stays unchanged.
+in `scripts/prepare-libvncclient.py` (patch identity `socket-idle-rsa33-apple-session-v6`). The checked-in submodule stays unchanged.
 Upstream's `WaitForMessage` returns immediately for cached bytes; exact reads
 must instead wait on the socket when their cached bytes form only a partial
 message. Otherwise fragmented TCP input can spin through its retry budget and
@@ -201,3 +201,23 @@ The cursor turns blue while the left button is held. Zoomed pointer-follow panni
 works during dragging. Opening keyboard/connection controls or starting a two-
 finger gesture cancels dragging safely. Host gesture tests and Galaxy native
 protocol/viewer/cursor tests pass; actual Mac text selection awaits owner feedback.
+
+
+## Saved sessions, clipboard and complete startup (0.15)
+
+**Remember connection securely** saves one successful login with Android
+Keystore AES-256-GCM. Saved passwords stay out of text controls. Returning from
+another app reconnects; saved resume intent also survives process recreation.
+Manual Disconnect and login rejection stop automatic return. Forget deletes the
+saved profile/key. See [connection behavior](../../docs/SAVED-CONNECTIONS.md).
+
+Enhanced Apple sessions now synchronize plain-text clipboard in both directions
+while focused, with explicit **Get Mac clipboard** and **Send phone clipboard**
+menu actions. Text is bounded to 1MiB; clipboard data is excluded from debug logs.
+Compatibility mode does not provide Apple clipboard sync.
+
+After encryption/display setup the client requests a complete image with a
+delayed retry, addressing missing startup areas; **Refresh desktop** is also in
+the menu. Synthetic Galaxy tests verify complete image recovery without pointer
+input, encrypted clipboard exchange, secure storage and lifecycle reconnection.
+Actual Mac 0.15 verification is pending; owner confirmed dragging works in 0.14.

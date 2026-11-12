@@ -15,8 +15,6 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /** Experimental Standard-mode path; kept separate from the working HP client. */
 public final class NativeActivity extends Activity implements TextureView.SurfaceTextureListener {
@@ -106,7 +104,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         remember=new android.widget.CheckBox(this);remember.setText("Remember connection securely");remember.setChecked(true);
         ConnectionProfile stored=saved.profile();
         if(stored!=null){host.setText(stored.host);port.setText(String.valueOf(stored.port));user.setText(stored.username);compatibility.setChecked(!stored.enhanced);pipeline.setChecked(stored.pipeline);password.setHint("Saved password");}
-        if(!synthetic&&stored!=null&&saved.autoResume()){profileSaved=true;connection.connect(stored);}
+        if((!synthetic||getIntent().getBooleanExtra("ivnc.synthetic.autostart",false))&&stored!=null&&saved.autoResume()){profileSaved=true;connection.connect(stored);}
         else connectionDialog();
         if(saved.error()!=null){status.setText(saved.error());status.setVisibility(View.VISIBLE);}
     }
@@ -133,8 +131,8 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         if(compatibility.getParent()!=null)((android.view.ViewGroup)compatibility.getParent()).removeView(compatibility);
         fields.addView(compatibility);
         if(remember.getParent()!=null)((android.view.ViewGroup)remember.getParent()).removeView(remember);fields.addView(remember);
-        TextView note=new TextView(this);note.setText(saved.profile()==null?"Login is encrypted on this device when remembered.":"Saved connection · password stored securely");fields.addView(note);
-        if(saved.profile()!=null){Button forget=new Button(this);forget.setText("Forget saved connection");forget.setOnClickListener(view->{
+        TextView note=new TextView(this);note.setText(saved.error()!=null?saved.error():saved.profile()==null?"Login is encrypted on this device when remembered.":"Saved connection · password stored securely");fields.addView(note);
+        if(saved.profile()!=null||saved.error()!=null){Button forget=new Button(this);forget.setText("Forget saved connection");forget.setTag("native-forget-connection");forget.setOnClickListener(view->{
             stop();saved.forget(ok->note.setText(ok?"Saved connection forgotten":"Could not fully remove saved connection"));
             password.setText("");password.setHint("Mac password");remember.setChecked(false);forget.setEnabled(false);
         });fields.addView(forget);}
@@ -165,7 +163,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             return;
         }
         if(kind.equals("status")&&value.equals("Apple encrypted control transport active"))clipboard.ready(true);
-        if(kind.equals("error")&&value.contains("authentication"))saved.autoResume(false);
+        if(kind.equals("error")&&NativeConnection.permanentFailure(value))saved.autoResume(false);
         debugLog.add(kind,kind.equals("metrics")?value+" "+renderer.counters():value);
         if(kind.equals("status")&&value.startsWith("Native standard VNC connected"))connected=true;
         if(kind.equals("error")||(kind.equals("status")&&value.equals("Native connection ended"))){connected=screenReady=false;clipboard.ready(false);trackpad.cancel();cursor.setVisibility(View.INVISIBLE);}

@@ -9,4 +9,6 @@
     <instrumentation android:name=".ViewerUxInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Fullscreen zoom UX regression" />
     <instrumentation android:name=".KeyboardInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Native keyboard UX regression" />
     <instrumentation android:name=".ProfileStoreInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Encrypted native saved profile regression" />
+    <instrumentation android:name=".SessionFeaturesInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Initial refresh and clipboard regression" />
+    <instrumentation android:name=".SavedSessionInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Saved session and lifecycle regression" />
 </manifest>

@@ -21,6 +21,9 @@ final class NativeConnection implements AutoCloseable {
     private boolean started,wanted;
     private ConnectionProfile profile;
     NativeConnection(NativeRfb.Events events){this.events=events;}
+    static boolean permanentFailure(String value){
+        return value.contains("authentication")||value.contains("denied")||value.contains("does not permit")||value.contains("does not offer enhanced");
+    }
     ConnectionProfile profile(){return profile;}
     void connect(ConnectionProfile profile){suspend();this.profile=profile;wanted=true;start();}
     void foreground(boolean visible){foreground=visible;if(visible)start();else suspend();}
@@ -40,7 +43,7 @@ final class NativeConnection implements AutoCloseable {
                 session=NativeRfb.create(new NativeRfb.Events(){
                     public void event(String kind,String value){main.post(()->{
                         if(token!=epoch||!foreground)return;
-                        if(kind.equals("error")&&(value.contains("authentication")||value.contains("denied")))wanted=false;
+                        if(kind.equals("error")&&permanentFailure(value))wanted=false;
                         if(kind.equals("status")&&value.equals("Native connection ended"))started=false;
                         events.event(kind,value);
                     });}

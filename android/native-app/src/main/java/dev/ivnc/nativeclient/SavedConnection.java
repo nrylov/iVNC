@@ -31,12 +31,12 @@ final class SavedConnection implements AutoCloseable {
     void autoResume(boolean wanted){preferences.edit().putBoolean("resume",wanted).apply();}
     void save(ConnectionProfile profile,Consumer<Boolean> result){
         if(!profile.remember)return;
-        final int token=revision;cached=profile;
+        final int token=++revision;cached=profile;error=null;
         storage.execute(()->{boolean success=false;try{success=store.save(profile.encryptedInput());}catch(Exception ignored){}
             final boolean saved=success;main.post(()->{if(token==revision){if(!saved)cached=null;result.accept(saved);}});});
     }
     void forget(Consumer<Boolean> result){
-        revision++;cached=null;autoResume(false);
+        revision++;cached=null;error=null;autoResume(false);
         storage.execute(()->{boolean forgotten=store.forget();main.post(()->result.accept(forgotten));});
     }
     @Override public void close(){storage.shutdown();}

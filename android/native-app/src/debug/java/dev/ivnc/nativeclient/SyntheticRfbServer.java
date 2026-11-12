@@ -18,6 +18,10 @@ import java.util.concurrent.TimeUnit;
 final class SyntheticRfbServer implements AutoCloseable {
     final ServerSocket listener;
     final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1),keyboard=new CountDownLatch(1),drag=new CountDownLatch(1);
+    final SyntheticClipboardPeer clipboardPeer=new SyntheticClipboardPeer();
+    final java.util.concurrent.atomic.AtomicInteger accepted=new java.util.concurrent.atomic.AtomicInteger(),logins=new java.util.concurrent.atomic.AtomicInteger(),fullRequests=new java.util.concurrent.atomic.AtomicInteger();
+    volatile boolean reconnect,partialUntilRefresh;
+    private boolean fullBaseline;
     private boolean dragStarted;
     private int keyboardIndex;
     volatile boolean verifyWheel,encrypted,encryptionActive,corruptRecord,enhanced,zeroGeometry;
@@ -37,11 +41,15 @@ final class SyntheticRfbServer implements AutoCloseable {
     SyntheticRfbServer(boolean wrappedKey,boolean rejectLogin,boolean fragmented) throws Exception {
         this.wrappedKey=wrappedKey;this.rejectLogin=rejectLogin;this.fragmented=fragmented;
         listener=new ServerSocket(0,1,java.net.InetAddress.getByName("127.0.0.1"));
-        thread=new Thread(()->{try{serve();}catch(Throwable error){if(!listener.isClosed())failure=error;}},"synthetic-rfb");
+        thread=new Thread(()->{
+            do{try{serve();}catch(Throwable error){if(!listener.isClosed()&&!(reconnect&&(error instanceof java.io.EOFException||error instanceof java.net.SocketException)))failure=error;}
+                finally{try{if(socket!=null)socket.close();}catch(Exception ignored){}encryptedPeer.close();compressor.reset();}
+            }while(reconnect&&!listener.isClosed());
+        },"synthetic-rfb");
         thread.start();
     }
     private void serve() throws Exception {
-        socket=listener.accept();socket.setSoTimeout(10000);socket.setTcpNoDelay(true);
+        socket=listener.accept();accepted.incrementAndGet();clipboardPeer.beginSession();encryptionActive=false;displayMetadataSent=fullBaseline=dragStarted=false;wheelIndex=keyboardIndex=0;socket.setSoTimeout(10000);socket.setTcpNoDelay(true);
         DataInputStream input=new DataInputStream(socket.getInputStream());DataOutputStream output=new DataOutputStream(socket.getOutputStream());
         output.writeBytes("RFB 003.889\n");output.flush();
         require(new String(input.readNBytes(12),java.nio.charset.StandardCharsets.US_ASCII).equals(enhanced?"RFB 003.889\n":"RFB 003.008\n"),"Unexpected version");
@@ -63,7 +71,7 @@ final class SyntheticRfbServer implements AutoCloseable {
         byte[] aes=rsa.doFinal(blob,138,wrapped);Cipher cipher=Cipher.getInstance("AES/ECB/NoPadding");cipher.init(Cipher.DECRYPT_MODE,new SecretKeySpec(aes,"AES"));
         byte[] plain=cipher.doFinal(blob,8,128);
         require(zeroString(plain,0).equals("synthetic-user")&&zeroString(plain,64).equals("synthetic-password"),"Login did not round trip");
-        stage="credentials verified";authenticated=true;output.writeInt(0);output.writeInt(rejectLogin?1:0);output.flush();
+        stage="credentials verified";authenticated=true;logins.incrementAndGet();output.writeInt(0);output.writeInt(rejectLogin?1:0);output.flush();
         if(rejectLogin){stage="authentication rejected";input.read();return;}
         require(input.readUnsignedByte()==(enhanced?0xc1:1),"ClientInit flags changed");
         output.writeShort(zeroGeometry?0:32);output.writeShort(zeroGeometry?0:32);
@@ -80,6 +88,7 @@ final class SyntheticRfbServer implements AutoCloseable {
         stage="ServerInit sent";int sent=0;
         while(true){
             int type=input.readUnsignedByte();
+            if(clipboardPeer.handle(type,input,output))continue;
             if(type==33){require(enhanced,"Unexpected ViewerInfo");byte[] viewer=input.readNBytes(65);require(viewer.length==65&&viewer[2]==62,"ViewerInfo framing changed");}
             else if(type==10){require(enhanced&&java.util.Arrays.equals(input.readNBytes(3),new byte[]{0,0,1}),"SetMode changed");}
             else if(type==13){require(enhanced&&java.util.Arrays.equals(input.readNBytes(7),new byte[]{1,0,0,0,0,0,0}),"SetDisplay changed");}
@@ -95,6 +104,7 @@ final class SyntheticRfbServer implements AutoCloseable {
                 if(enhanced){frame(input,output);sent=2;}
             }
             else if(type==3){byte[] update=input.readNBytes(9);
+                if(encryptionActive&&update.length==9&&update[0]==0){fullBaseline=true;fullRequests.incrementAndGet();}
                 if(enhanced&&encryptionActive)require(update.length==9&&update[0]==0,"Push session sent redundant incremental request");
                 if(encrypted&&!encryptionActive)continue;
                 if(requireAhead)require(sent==0,"Duplicate next-update request after pipelined frame");
@@ -143,14 +153,15 @@ final class SyntheticRfbServer implements AutoCloseable {
             output.writeShort(1);for(int i=0;i<4;i++)output.writeShort(32);output.writeInt(1);output.writeInt(0);output.writeShort(0);
         }
         if(cursorPosition){output.writeShort(11);output.writeShort(17);output.writeShort(0);output.writeShort(0);output.writeInt(-232);}
-        output.writeShort(0);output.writeShort(0);output.writeShort(32);output.writeShort(32);output.writeInt(zrle?16:0);
+        int pixelWidth=partialUntilRefresh&&!fullBaseline?16:32;
+        output.writeShort(0);output.writeShort(0);output.writeShort(pixelWidth);output.writeShort(32);output.writeInt(zrle?16:0);
         if(zrle){
             compressor.setInput(new byte[]{1,(byte)241,64,32});
             byte[] encoded=new byte[1024];int length=compressor.deflate(encoded,0,encoded.length,java.util.zip.Deflater.SYNC_FLUSH);
             require(length>0&&compressor.needsInput(),"Synthetic ZRLE compression failed");
             output.writeInt(length);output.write(encoded,0,length);output.flush();return;
         }
-        byte[] pixels=new byte[32*32*4];
+        byte[] pixels=new byte[pixelWidth*32*4];
         for(int offset=0;offset<pixels.length;offset+=4){pixels[offset]=(byte)241;pixels[offset+1]=64;pixels[offset+2]=32;}
         sendBody(output,pixels,32);
     }

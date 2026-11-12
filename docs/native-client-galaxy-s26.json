@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-11",
+  "date": "2026-11-12",
   "package": "dev.ivnc.nativeclient",
   "libraryCommit": "98aaee0560baa0332339b2ef464ea96ed9b9b28c",
   "localPatch": "socket-idle-rsa33-apple-session-v6",
@@ -35,9 +35,9 @@
   "webViewOrNoVNCRuntimeIncluded": false,
   "realMacSession": "Owner verified accepted login and live 1920x1080 native framebuffer",
   "highPerformance": "Not yet ported",
-  "appleClipboard": "Not yet ported",
+  "appleClipboard": "Implemented encrypted Apple text clipboard; synthetic native Galaxy tests pass; actual Mac verification pending",
   "release": "On hold by owner until native is evaluated",
-  "appVersion": "0.14-native-drag",
+  "appVersion": "0.15-native-sessions-clipboard",
   "realMacPublicKeyProbe": {
     "passed": true,
     "credentialsSent": false,
@@ -45,18 +45,18 @@
     "publicKeyParsedByAndroidCrypto": true
   },
   "observedNativeSurfacePostsPerSecond": 26.4,
-  "performanceComparison": "Owner reports optimized native Standard improved but remains below earlier hybrid Standard. Native still lacks enhanced Apple setup/codecs.",
+  "performanceComparison": "Owner confirms enhanced Apple Standard 0.12 much smoother; mostly 80\u2013140 Surface posts/sec in supplied log. Not physical display FPS; no controlled A/B.",
   "nativeLibraryCOptimization": "-O3 verified in rfbclient.c compile command",
   "optimizedRealMacPerformance": {
     "version": "0.5-native-optimized",
     "source": "Owner pasted safe timing log",
-    "typicalSurfacePostsPerSecond": "29–38",
-    "laterSurfacePostsPerSecond": "50–54",
-    "typicalHandlerCpuMsPerPost": "6–10",
-    "typicalRenderWallMsPerPost": "3–5 (subset of handler wall)",
-    "typicalOuterSocketWaitMsPerPost": "20–25",
+    "typicalSurfacePostsPerSecond": "29\u201338",
+    "laterSurfacePostsPerSecond": "50\u201354",
+    "typicalHandlerCpuMsPerPost": "6\u201310",
+    "typicalRenderWallMsPerPost": "3\u20135 (subset of handler wall)",
+    "typicalOuterSocketWaitMsPerPost": "20\u201325",
     "interpretation": "Substantial update-delivery waiting; not a fixed 30fps cap. Does not isolate server encoding versus network/request timing.",
-    "latestOwnerLog": "0.11: mostly 27–35 posts/sec pipeline on, 23–27 off, with dips; work differs so not a controlled A/B. FPS remains low with transform counts flat."
+    "latestOwnerLog": "0.11: mostly 27\u201335 posts/sec pipeline on, 23\u201327 off, with dips; work differs so not a controlled A/B. FPS remains low with transform counts flat."
   },
   "nativeCursor": "Generic local arrow; immediate local motion and server PointerPos sync. Not server cursor artwork.",
   "requestPipelineRealMacComparison": "Installed; awaiting owner on/off comparison. No speed improvement claimed yet.",
@@ -67,7 +67,7 @@
     "realMacResponse": "Owner confirms 0.8 improved scrolling but requests slightly faster; 0.9 default raised 50%, awaiting feedback",
     "sensitivity": {
       "defaultMultiplier": 12,
-      "range": "1–24",
+      "range": "1\u201324",
       "savedLocally": true,
       "defaultDpPerWheelTick": 2,
       "previousDpPerWheelTick": 24,
@@ -75,7 +75,7 @@
     }
   },
   "nativeZoom": {
-    "range": "1–8x aspect fit",
+    "range": "1\u20138x aspect fit",
     "pinch": "Local focal zoom, exclusive with scrolling",
     "navigation": "One-finger trackpad with pointer-follow panning at viewport edges",
     "controls": "Fullscreen with translucent floating menu; diagnostics in submenu",
@@ -84,7 +84,7 @@
     "appOnlySyntheticVisualReview": "PASS",
     "realMacOwnerTest": "Owner confirms zoom/fullscreen works well, reports performance below hybrid and possibly earlier native"
   },
-  "nextOwnerPriority": "High Performance native session/transport integration after zoom/UX",
+  "nextOwnerPriority": "Verify native saved sessions/clipboard/initial image, then native High Performance",
   "uiRenderGuard": {
     "reason": "Pointer-only motion was reapplying identical TextureView transforms",
     "changes": "Reuse Matrix, skip unchanged transforms and cursor positions",
@@ -112,12 +112,12 @@
     "syntheticGalaxySession": "PASS",
     "fragmentedZeroSizeGeometryStartup": "PASS",
     "realMacPublicKeyProbe": "PASS; no credentials sent",
-    "realMacFullSession": "Owner confirms much smoother live session; log shows updates=push, mostly ~80–140 Surface posts/sec and ~0.5–3ms socket wait/post. Not physical display FPS.",
+    "realMacFullSession": "Owner confirms much smoother live session; log shows updates=push, mostly ~80\u2013140 Surface posts/sec and ~0.5\u20133ms socket wait/post. Not physical display FPS.",
     "highPerformance": "Not implemented yet"
   },
   "nativeKeyboard": {
     "buttons": "Dedicated floating keyboard and separate options menu",
-    "features": "Phone typing, one-shot Ctrl/Alt/Cmd/Shift, arrows, Esc/Tab/navigation/F1–F12",
+    "features": "Phone typing, one-shot Ctrl/Alt/Cmd/Shift, arrows, Esc/Tab/navigation/F1\u2013F12",
     "transport": "Serialized atomic key batches; full tunnel or per-key auth-key encryption in compatibility mode",
     "hostModel": "PASS",
     "galaxyEnhancedAndCompatibilityProtectedKeyBatches": "PASS",
@@ -132,6 +132,17 @@
     "galaxyEncryptedAndCompatibility1000MoveRelease": "PASS",
     "galaxyViewerClutchAndMenuRelease": "PASS",
     "galaxyBlueCursorDrawing": "PASS",
-    "realMacSelection": "Awaiting owner test"
+    "realMacSelection": "Owner confirms working as expected"
+  },
+  "nativeSessionsAndClipboard": {
+    "initialEncryptedFullRefresh": "PASS: partial synthetic image fully restored without pointer input; delayed retry",
+    "secureProfile": "PASS: Android Keystore AES-256-GCM, fresh IV, tamper rejection, Forget",
+    "lifecycle": "PASS: pause/resume, saved Activity recreation, zoom retention including zero-size startup, stale callbacks",
+    "stopAndRecovery": "PASS: manual Disconnect, rejected-login resume suppression, Forget including unreadable profile",
+    "passwordControls": "PASS: saved secret never populated into EditText",
+    "clipboard": "PASS: native encrypted UTF-8 both directions, IDs, state-change/data-needed; fake clipboard only",
+    "hostClipboardPolicy": "PASS: bounds, echo suppression, no background reads, returning phone-copy priority",
+    "ownerVerification": "Pending actual Mac 0.15 test",
+    "privacy": "Synthetic credentials, separate test preferences/keys, memory clipboard; owner data untouched"
   }
 }

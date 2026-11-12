@@ -50,14 +50,14 @@ particular frame rate.
 
 ## Current status (2026-11-12)
 
-Native 0.14 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
+Native 0.15 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
 Mac login, live 1920×1080 Standard updates, relative pointer input and two-finger
 scrolling. Synthetic/device regressions cover Apple RSA/AES auth, fragmented
 reads, exact native pixels, cursor, pipeline request ordering and wheel packets.
 It also has full-screen controls, native pinch zoom, pointer-follow panning,
 adjustable scroll speed and a dedicated advanced keyboard. Owner confirmed zoom
 and much smoother enhanced Apple Standard with 3.889/push updates. Native key/IME
-regressions pass; owner confirms native keyboard typing works. Native tap-drag/drag lock are now implemented, with real Mac selection feedback pending. See HANDOFF.md and
+regressions pass; owner confirms native keyboard typing works. Owner also confirmed native tap-drag/drag lock selection works. See HANDOFF.md and
 native-client-galaxy-s26.json for current validation and limitations.
 
 Owner's next requested milestone is High Performance. The existing hybrid has
@@ -76,5 +76,9 @@ still lacks its negotiation and media transport. Integration requires:
 5. Verify actual Mac streaming, stalls/recovery, Surface loss and return from
    another app on Galaxy. Preserve Standard fallback and working hybrid app.
 
-Apple clipboard and secure native profiles/reconnect are still pending. Release stays on hold until owner selects a base. Native architecture
+Native 0.15 adds encrypted saved login, foreground/cold-launch reconnect and Apple
+text clipboard, plus a complete refresh after encryption to address incomplete
+startup images. Synthetic Galaxy tests cover these paths and regressions; actual
+Mac verification is pending. See [saved connection behavior](SAVED-CONNECTIONS.md).
+Release stays on hold until owner selects a base. Native architecture
 removes the bridge but does not by itself guarantee improved performance.
