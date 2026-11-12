@@ -143,3 +143,11 @@ Zoom is local and does not change the Mac's resolution.
 Host geometry/gesture tests and real Galaxy synthetic UX/cursor/password tests
 pass. Actual Mac zoom and navigation are awaiting owner feedback. High Performance
 mode is the next requested milestone and is not implemented in the native app yet.
+
+
+0.11 avoids reapplying an identical TextureView transform during pointer motion
+and avoids redrawing a cursor whose screen position is unchanged. Metrics include
+cumulative `ui_transform_applied` and `ui_transform_skipped` work counts. Device
+regression verifies 2000 repeated pointer updates add no transforms or cursor
+redraws while pinch still changes the actual texture Matrix. Actual Mac speed
+impact awaits owner feedback; this does not close the missing Apple HP path.

@@ -41,6 +41,16 @@ public final class ViewerUxInstrumentation extends Instrumentation {
                 paint.setColor(Color.WHITE);paint.setTextSize(54);canvas.drawText("Synthetic desktop • zoom test",100,200,paint);texture.unlockCanvasAndPost(canvas);
                 Method action=NativeActivity.class.getDeclaredMethod("viewerAction",String.class);action.setAccessible(true);action.invoke(target,"zoom-in");
                 DesktopViewport viewport=(DesktopViewport)field(target,"viewport");near(viewport.zoom(),1.4f);
+                // Thousands of pointer-only updates must not reapply an identical
+                // video transform or redraw an unchanged cursor.
+                ViewportRenderer renderer=(ViewportRenderer)field(target,"renderer");long transforms=renderer.applied();
+                Method pointer=NativeActivity.class.getDeclaredMethod("pointer",int.class);pointer.setAccessible(true);
+                action.invoke(target,"fit");transforms=renderer.applied();
+                CursorOverlay cursor=(CursorOverlay)field(target,"cursor");long redraws=cursor.redraws();
+                for(int i=0;i<2000;i++)pointer.invoke(target,0);
+                require(renderer.applied()==transforms,"Pointer-only input reapplied video transforms");
+                require(cursor.redraws()==redraws,"Unchanged cursor was redrawn");
+                action.invoke(target,"zoom-in");
                 Method touch=NativeActivity.class.getDeclaredMethod("touch",View.class,MotionEvent.class);touch.setAccessible(true);
                 send(target,touch,texture,MotionEvent.ACTION_DOWN,new float[]{200},new float[]{400});
                 send(target,touch,texture,MotionEvent.ACTION_POINTER_DOWN|(1<<8),new float[]{200,600},new float[]{400,400});
@@ -62,7 +72,7 @@ public final class ViewerUxInstrumentation extends Instrumentation {
             android.view.PixelCopy.request(target.getWindow(),screenshot,value->{copyResult.set(value);copied.countDown();},new android.os.Handler(android.os.Looper.getMainLooper()));
             require(copied.await(5,java.util.concurrent.TimeUnit.SECONDS)&&copyResult.get()==android.view.PixelCopy.SUCCESS,"Synthetic app-window copy failed");
             try(FileOutputStream file=getTargetContext().openFileOutput("synthetic-viewer-ux.png",0)){screenshot.compress(Bitmap.CompressFormat.PNG,100,file);}finally{screenshot.recycle();}
-            result.putString("stream","PASS: actual MotionEvent pinch, TextureView focal transform, hidden connected toolbar and floating menu; synthetic UI screenshot saved. No Mac connection.");finish(Activity.RESULT_OK,result);
+            result.putString("stream","PASS: actual MotionEvent pinch, TextureView focal transform, 2000 unchanged pointer updates skipped, cursor deduplication, hidden connected toolbar and floating menu; synthetic UI screenshot saved. No Mac connection.");finish(Activity.RESULT_OK,result);
         }catch(Throwable error){result.putString("stream","VIEWER UX FAILED: "+error);finish(Activity.RESULT_CANCELED,result);}
         finally{if(activity!=null){NativeActivity target=activity;runOnMainSync(target::finish);}}
     }

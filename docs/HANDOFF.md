@@ -1,3 +1,31 @@
+# Native UI render guard after zoom feedback — 2026-11-11
+
+Owner confirms zoom/fullscreen UX works well but performance remains worse than
+older hybrid, and possibly earlier native too. Both baselines matter. Native's
+missing enhanced Apple Standard/HP paths remain a separate larger gap.
+
+Found definite new unnecessary work: every local pointer event called
+TextureView.setTransform even when fit/zoom/pan geometry was unchanged. Native
+0.11-native-render-guard caches the geometry, reuses its Matrix and applies only
+when dimensions, zoom or pan actually change. CursorOverlay skips invalidation
+when its on-screen position and viewport size are unchanged. Real cursor motion
+and viewport changes still redraw normally. The safe metrics log now includes
+cumulative ui_transform_applied / ui_transform_skipped counts. These are work
+counters, not proof of an FPS improvement.
+
+Project-local build and host log/gesture/viewport tests PASS. Galaxy synthetic
+ViewerUxInstrumentation PASS including 2000 repeated pointer updates with no
+additional video transforms or cursor redraws, plus actual pinch/MotionEvent and
+TextureView transform checks. Galaxy cursor drawing/geometry test PASS. Installed
+0.11 and opened it for owner. No real Mac performance gain claimed yet.
+
+Owner asked for ~20s scrolling at Fit desktop, then zoomed, and Debug log including
+native frame timings and UI counters. Await that feedback. Continue native High
+Performance integration as the next major milestone, as requested after zoom/UX;
+reuse prior decoder but port encrypted Apple session setup and media transport.
+Keep Standard fallback, working hybrid and release hold. Do not attribute the
+whole hybrid gap to zoom or claim Standard equals HP.
+
 # Native pinch zoom and fullscreen controls — 2026-11-11
 
 Owner prioritizes native zoom and better layout/UX, then explicitly asks for

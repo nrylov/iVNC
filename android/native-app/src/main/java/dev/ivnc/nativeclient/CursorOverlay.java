@@ -14,6 +14,10 @@ final class CursorOverlay extends View {
     private int frameWidth=1,frameHeight=1;
     private float remoteX,remoteY;
     private DesktopViewport viewport;
+    private float lastX=Float.NaN,lastY;
+    private int lastWidth,lastHeight;
+    private long redraws;
+    long redraws(){return redraws;}
     void viewport(DesktopViewport value){viewport=value;invalidate();}
     CursorOverlay(Context context){
         super(context);setClickable(false);setFocusable(false);setTag("native-cursor");
@@ -22,7 +26,12 @@ final class CursorOverlay extends View {
     }
     void position(int width,int height,float x,float y){
         frameWidth=Math.max(1,width);frameHeight=Math.max(1,height);
-        remoteX=Math.max(0,Math.min(frameWidth-1,x));remoteY=Math.max(0,Math.min(frameHeight-1,y));invalidate();
+        remoteX=Math.max(0,Math.min(frameWidth-1,x));remoteY=Math.max(0,Math.min(frameHeight-1,y));
+        float scale=ViewportMath.scale(getWidth(),getHeight(),frameWidth,frameHeight);
+        float px=viewport==null?ViewportMath.x(getWidth(),frameWidth,scale,remoteX):viewport.x(remoteX);
+        float py=viewport==null?ViewportMath.y(getHeight(),frameHeight,scale,remoteY):viewport.y(remoteY);
+        if(px==lastX&&py==lastY&&getWidth()==lastWidth&&getHeight()==lastHeight)return;
+        lastX=px;lastY=py;lastWidth=getWidth();lastHeight=getHeight();redraws++;invalidate();
     }
     @Override protected void onDraw(Canvas canvas){
         super.onDraw(canvas);

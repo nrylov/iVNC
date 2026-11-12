@@ -24,6 +24,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private final Object lifetime=new Object();
     private long handle;
     private TextureView texture;
+    private ViewportRenderer renderer;
     private final DesktopViewport viewport=new DesktopViewport();
     private CursorOverlay cursor;
     private android.widget.ToggleButton pipeline;
@@ -48,7 +49,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             " · Android "+android.os.Build.VERSION.RELEASE+" (API "+android.os.Build.VERSION.SDK_INT+")");
         FrameLayout root=new FrameLayout(this);
         root.setBackgroundColor(0xff080d14);
-        texture=new TextureView(this);texture.setSurfaceTextureListener(this);
+        texture=new TextureView(this);texture.setSurfaceTextureListener(this);renderer=new ViewportRenderer(texture);
         root.addView(texture,new FrameLayout.LayoutParams(-1,-1));
         cursor=new CursorOverlay(this);cursor.setVisibility(View.INVISIBLE);root.addView(cursor,new FrameLayout.LayoutParams(-1,-1));
         cursor.viewport(viewport);
@@ -132,7 +133,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             }
             return;
         }
-        debugLog.add(kind,value);
+        debugLog.add(kind,kind.equals("metrics")?value+" "+renderer.counters():value);
         if(kind.equals("status")&&value.startsWith("Native standard VNC connected"))connected=true;
         if(kind.equals("error")||(kind.equals("status")&&value.equals("Native connection ended"))){connected=false;cursor.setVisibility(View.INVISIBLE);}
         if(kind.equals("metrics")||kind.equals("protocol"))return;
@@ -162,12 +163,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         }
     }
     private void fit(){viewport.resize(texture.getWidth(),texture.getHeight(),width,height);applyViewport();}
-    private void applyViewport(){
-        if(texture.getWidth()<1||texture.getHeight()<1)return;
-        android.graphics.Matrix transform=new android.graphics.Matrix();
-        transform.setScale(viewport.imageWidth()/texture.getWidth(),viewport.imageHeight()/texture.getHeight());
-        transform.postTranslate(viewport.left(),viewport.top());texture.setTransform(transform);updateCursor();
-    }
+    private void applyViewport(){renderer.apply(viewport);updateCursor();}
     private void updateCursor(){cursor.position(width,height,cursorX,cursorY);}
     private boolean touch(View view,MotionEvent event){
         int action=event.getActionMasked(),index=event.getActionIndex();
