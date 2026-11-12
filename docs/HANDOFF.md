@@ -1,3 +1,23 @@
+# Native scroll sensitivity — 2026-11-11
+
+Owner confirms native scrolling works on the Mac with Pipeline on and off, but
+0.7 scroll distance was impractically small. Changed 0.8-native-scroll-speed to
+8x default sensitivity (3dp per wheel tick, versus 24dp previously), with a Scroll
+button opening a saved 1x–24x slider. Non-secret viewer-input SharedPreferences
+only; it does not store connection/auth details. Pointer speed is unchanged.
+Wheel bursts stay bounded to 16 ticks per contact move per axis, preserving the
+atomic native press/release queue. Tap slop is unchanged to avoid jitter scrolling.
+
+Build PASS, host gesture regressions PASS including 8x swipe output, bounded
+large-input bursts and two-finger tap jitter. Galaxy UI/masking/debug regression
+and native ZRLE/wheel integration both PASS after installation.
+Native 0.8 installed for owner sensitivity test; real-Mac feel still needs owner
+confirmation. Existing cursor and Pipeline toggle remain. No hybrid changes.
+
+Next: owner try default 8x; use Scroll slider if needed. Resume identical activity
+Pipeline comparison, then enhanced Apple Standard setup/codecs and HP port.
+Release remains ON HOLD until owner chooses a base.
+
 # Native two-finger scrolling — 2026-11-11
 
 Owner reported scrolling did nothing with Pipeline on or off. This was missing

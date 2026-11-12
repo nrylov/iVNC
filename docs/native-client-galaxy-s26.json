@@ -37,7 +37,7 @@
   "highPerformance": "Not yet ported",
   "appleClipboard": "Not yet ported",
   "release": "On hold by owner until native is evaluated",
-  "appVersion": "0.7-native-scroll",
+  "appVersion": "0.8-native-scroll-speed",
   "realMacPublicKeyProbe": {
     "passed": true,
     "credentialsSent": false,
@@ -63,6 +63,14 @@
     "gestures": "Two-finger natural scrolling on both axes; two-finger tap right-click",
     "transport": "Standard RFB wheel masks 8/16/32/64 with atomic queued press/release",
     "hostGestureRegression": "PASS",
-    "realMacResponse": "Awaiting owner test"
+    "realMacResponse": "Owner confirms scrolling works in 0.7 with Pipeline on/off, but distance too small; awaiting 0.8 sensitivity feedback",
+    "sensitivity": {
+      "defaultMultiplier": 8,
+      "range": "1–24",
+      "savedLocally": true,
+      "defaultDpPerWheelTick": 3,
+      "previousDpPerWheelTick": 24,
+      "hostRegressions": "PASS: eightfold swipe output, bounded bursts, tap jitter"
+    }
   }
 }

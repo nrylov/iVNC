@@ -62,6 +62,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             debugLog.add("status","Update request pipeline "+(enabled?"enabled":"disabled")+" for subsequent updates");
         });
         actions.addView(pipeline,new LinearLayout.LayoutParams(0,-2,1));bar.addView(actions);
+        ScrollSettings.attach(this,actions,speed->{if(trackpad!=null)trackpad.setScrollSpeed(speed);});
         root.addView(bar,new FrameLayout.LayoutParams(-1,-2));
         trackpad=new NativeTrackpad(getResources().getDisplayMetrics().density,new NativeTrackpad.Output(){
             public void move(float dx,float dy){
@@ -72,6 +73,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             public void click(int button){pointer(button);pointer(0);}
             public void wheel(int mask){synchronized(lifetime){if(handle!=0)NativeRfb.wheel(handle,(int)cursorX,(int)cursorY,mask);}}
         });
+        trackpad.setScrollSpeed(ScrollSettings.savedSpeed(this));
         texture.setOnTouchListener(this::touch);
         setContentView(root);
         host=field("Mac address",InputType.TYPE_CLASS_TEXT);port=field("Port",InputType.TYPE_CLASS_NUMBER);port.setText("5900");

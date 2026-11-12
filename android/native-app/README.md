@@ -112,4 +112,11 @@ tap right-clicks. Scroll steps are independent of desktop resolution/zoom.
 This sends standard RFB wheel buttons 4–7 (masks 8/16/32/64), each followed by a
 release, queued atomically. It does not yet implement Apple's smooth scroll
 extension. Host gesture regressions and Galaxy native packet tests pass with
-Pipeline on and off; actual Mac scrolling is awaiting owner confirmation.
+Pipeline on and off; the owner confirms Mac scrolling works with Pipeline on and off, though the initial sensitivity was too low.
+
+
+0.8 increases the default scroll sensitivity to **8×** (3dp per wheel tick rather
+than 24dp). Use the **Scroll** button to adjust it from 1× to 24×. The setting is
+saved locally and restored on the next launch; pointer speed is independent.
+Large event bursts remain bounded and two-finger tap slop is unchanged. Actual
+Mac feel at the new default is awaiting owner feedback.

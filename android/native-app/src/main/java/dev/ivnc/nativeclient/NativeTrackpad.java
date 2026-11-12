@@ -11,11 +11,18 @@ final class NativeTrackpad {
     private static final int UP=8,DOWN=16,LEFT=32,RIGHT=64;
     private final Map<Integer,float[]> contacts=new LinkedHashMap<>();
     private final Output output;
-    private final float tapSlop,scrollStep;
+    // The initial 24dp/notch mapping was impractically slow on the owner's Mac.
+    // Keep it as the 1x baseline, with an adjustable 8x default.
+    static final int DEFAULT_SCROLL_SPEED=8;
+    private static final int MAX_STEPS_PER_MOVE=16;
+    private final float tapSlop,baseScrollStep;
+    private float scrollStep;
     private int maximum;
     private long started;
     private float distance,scrollX,scrollY;
-    NativeTrackpad(float density,Output output){this.output=output;tapSlop=10*density;scrollStep=24*density;}
+    NativeTrackpad(float density,Output output){this.output=output;tapSlop=10*density;baseScrollStep=24*density;setScrollSpeed(DEFAULT_SCROLL_SPEED);}
+    /** Changes wheel sensitivity independently of pointer speed and desktop zoom. */
+    void setScrollSpeed(int multiplier){scrollStep=baseScrollStep/Math.max(1,Math.min(24,multiplier));scrollX=scrollY=0;}
     void down(int id,float x,float y,long time){
         if(contacts.isEmpty()){maximum=0;started=time;distance=scrollX=scrollY=0;}
         contacts.put(id,new float[]{x,y});maximum=Math.max(maximum,contacts.size());
@@ -31,9 +38,9 @@ final class NativeTrackpad {
         scrollX+=dx/2;scrollY+=dy/2;
         if(distance<=tapSlop)return;
         int steps=0;
-        while(Math.abs(scrollY)>=scrollStep&&steps++<8){output.wheel(scrollY>0?UP:DOWN);scrollY+=scrollY>0?-scrollStep:scrollStep;}
+        while(Math.abs(scrollY)>=scrollStep&&steps++<MAX_STEPS_PER_MOVE){output.wheel(scrollY>0?UP:DOWN);scrollY+=scrollY>0?-scrollStep:scrollStep;}
         steps=0;
-        while(Math.abs(scrollX)>=scrollStep&&steps++<8){output.wheel(scrollX>0?LEFT:RIGHT);scrollX+=scrollX>0?-scrollStep:scrollStep;}
+        while(Math.abs(scrollX)>=scrollStep&&steps++<MAX_STEPS_PER_MOVE){output.wheel(scrollX>0?LEFT:RIGHT);scrollX+=scrollX>0?-scrollStep:scrollStep;}
         // Do not retain an unbounded backlog after a large/coalesced input event.
         scrollX=Math.max(-scrollStep,Math.min(scrollStep,scrollX));scrollY=Math.max(-scrollStep,Math.min(scrollStep,scrollY));
     }
