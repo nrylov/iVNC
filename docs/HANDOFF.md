@@ -1,3 +1,39 @@
+# Native two-finger scrolling — 2026-11-11
+
+Owner reported scrolling did nothing with Pipeline on or off. This was missing
+input support: NativeActivity previously discarded every multi-touch event.
+Earlier request to compare scrolling was premature. Pipeline controls framebuffer
+requests, not mouse input. Regular-app pointer-follow experiment was deferred at
+owner request; ignored .dev/deferred-pointer-follow.patch retains it, no hybrid
+source changes committed. Continue with native as the active project.
+
+Native 0.7-native-scroll now implements independent NativeTrackpad contact state:
+one finger moves the pointer, tap left-clicks; two fingers scroll naturally on
+both axes, short two-finger tap right-clicks. Uses standard RFB wheel masks
+8/16/32/64 with paired release at the current cursor location. Scroll step is
+24dp, independent of desktop scale. Multi-touch keeps pointer still; lifting one
+finger cannot move/click until all contacts lift. Cancellation/three fingers
+suppress further input. JNI queues each wheel press/release atomically with room
+for both, preventing a stuck wheel button when the 256-command queue is full.
+This is discrete standard VNC scrolling, not Apple's smooth gesture extension.
+
+Validation:
+- Project-local build PASS. Host gesture test PASS: single-pointer, taps, four
+  scroll directions, partial lift suppression, three fingers, cancellation.
+- Galaxy synthetic native tests PASS with Pipeline on (ZRLE, request-before-body)
+  and off (Raw): exact pixels/auth/pointer and all four wheel masks + releases.
+- Galaxy cursor rendering/geometry/stacking/visibility test PASS.
+- Actual Mac scrolling still needs owner confirmation; synthetic packet checks
+  cannot establish the Mac's response to standard wheel messages.
+Wireless ADB rediscovered after user refreshed it; no fresh pairing required.
+Installed 0.7, opened NativeActivity for owner test. No private desktop contents,
+credentials or clipboard were read. Working hybrid remains untouched.
+
+Next: owner try two-finger scrolling and cursor in native. Compare Pipeline on/off
+using identical window activity and timing logs, then enhanced Apple Standard
+setup/codecs, HP port, native zoom/panning and remaining input/profile features.
+Release remains ON HOLD pending owner selection of native vs hybrid base.
+
 # Native cursor and bounded update pipelining — 2026-11-11
 
 Owner tested optimized native 0.5: improved but below earlier hybrid Standard,

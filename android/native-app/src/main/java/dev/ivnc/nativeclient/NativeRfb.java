@@ -12,5 +12,6 @@ final class NativeRfb {
     static native void stop(long handle);
     static native void destroy(long handle);
     static native void pipeline(long handle,boolean enabled);
+    static native void wheel(long handle,int x,int y,int mask);
     static native void pointer(long handle,int x,int y,int buttons);
 }

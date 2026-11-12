@@ -6,7 +6,7 @@ RSA type-33 login. No WebView, JavaScript, noVNC or AVNC app/UI code is packaged
 
 Package `dev.ivnc.nativeclient` installs alongside the working hybrid client.
 This first experiment implements Standard RFB rendering and basic relative mouse
-input. Apple High Performance, Apple clipboard, keyboard extensions, secure
+input, plus two-finger scrolling and two-finger tap to right-click. Apple High Performance, Apple clipboard, keyboard extensions, secure
 profile persistence and lifecycle reconnection are not integrated here yet.
 It is not feature-equivalent to the working client and is not a release candidate.
 
@@ -99,3 +99,17 @@ updates synchronize it while local input is idle; the artwork is a generic arrow
 Cursor-only updates do not render/count as desktop frames. Cursor coordinates are
 not retained in the Debug log. Device tests verify actual cursor pixels, stacking,
 input passthrough and portrait/landscape geometry using synthetic data.
+
+
+## Native scrolling (0.7)
+
+Place the pointer over the desired Mac window with one finger, then slide two
+fingers anywhere on the desktop to scroll. Finger motion down reveals content
+above (natural scrolling); horizontal motion is supported too. One finger lifting
+partway through a scroll does not move or click the pointer. A short two-finger
+tap right-clicks. Scroll steps are independent of desktop resolution/zoom.
+
+This sends standard RFB wheel buttons 4–7 (masks 8/16/32/64), each followed by a
+release, queued atomically. It does not yet implement Apple's smooth scroll
+extension. Host gesture regressions and Galaxy native packet tests pass with
+Pipeline on and off; actual Mac scrolling is awaiting owner confirmation.

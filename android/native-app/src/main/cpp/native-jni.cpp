@@ -20,3 +20,11 @@ extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_pointer(J
 extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_pipeline(JNIEnv*,jclass,jlong handle,jboolean enabled){
     if(handle)reinterpret_cast<NativeSession*>(handle)->pipelineUpdates=(enabled==JNI_TRUE);
 }
+
+// Wheel press/release must enter the bounded queue together, so saturation cannot
+// leave a wheel button held. Both writes still happen on the protocol worker.
+extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_wheel(JNIEnv*,jclass,jlong handle,jint x,jint y,jint mask){
+    if(!handle||(mask!=8&&mask!=16&&mask!=32&&mask!=64))return;
+    auto* session=reinterpret_cast<NativeSession*>(handle);std::lock_guard<std::mutex> guard(session->inputMutex);
+    if(session->input.size()<=254){session->input.push_back({x,y,mask});session->input.push_back({x,y,0});}
+}

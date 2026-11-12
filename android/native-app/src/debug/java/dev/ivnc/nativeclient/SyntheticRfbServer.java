@@ -17,7 +17,9 @@ import java.util.concurrent.TimeUnit;
 /** No real Mac login, screen contents or session secrets enter this test. */
 final class SyntheticRfbServer implements AutoCloseable {
     final ServerSocket listener;
-    final CountDownLatch pointer=new CountDownLatch(1);
+    final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1);
+    volatile boolean verifyWheel;
+    private int wheelIndex;
     volatile Throwable failure;
     volatile boolean authenticated, zrle, requireAhead, aheadReceived, cursorPosition;
     volatile int frameLimit=2;
@@ -73,7 +75,11 @@ final class SyntheticRfbServer implements AutoCloseable {
                 if(sent++<frameLimit)frame(input,output);
             }
             else if(type==5){int buttons=input.readUnsignedByte(),x=input.readUnsignedShort(),y=input.readUnsignedShort();
-                require(buttons==0&&x==11&&y==17,"Pointer coordinates changed");pointer.countDown();}
+                require(x==11&&y==17,"Pointer coordinates changed");
+                if(verifyWheel){int[] expected={0,8,0,16,0,32,0,64,0};
+                    require(wheelIndex<expected.length&&buttons==expected[wheelIndex++],"Wheel press/release ordering changed");
+                    if(wheelIndex==expected.length)wheel.countDown();
+                }else require(buttons==0,"Pointer buttons changed");pointer.countDown();}
             else throw new IllegalStateException("Unexpected client message "+type);
         }
     }
