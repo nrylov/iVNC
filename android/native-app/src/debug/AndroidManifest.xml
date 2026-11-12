@@ -6,4 +6,5 @@
     <instrumentation android:name=".MacKeyProbeInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Mac public-key handshake probe" />
     <instrumentation android:name=".NativeMetricsInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Native timing report regression" />
     <instrumentation android:name=".CursorInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Native cursor rendering regression" />
+    <instrumentation android:name=".ViewerUxInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Fullscreen zoom UX regression" />
 </manifest>

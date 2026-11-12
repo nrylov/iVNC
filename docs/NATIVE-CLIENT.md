@@ -2,7 +2,7 @@
 
 The owner selected LibVNCClient as the protocol core, with an original Android UI.
 No AVNC application or UI code is needed. This document records the migration
-boundary; it does not describe an already implemented native client.
+boundary and the current native test-client status.
 
 ## Components
 
@@ -30,9 +30,7 @@ Review the combined native application license before distributing builds.
 
 The working hybrid app remains on `main`; the additional prototype controls,
 secure-profile implementation and reconnect policy were preserved on the pushed
-`prototype-webview` branch at `c530e44`. Saved profiles and lifecycle reconnect
-are now integrated on main (Android 0.5); fullscreen/keyboard controls remain on
-that branch. Reuse suitable owned components while
+`prototype-webview` branch at `c530e44`. The hybrid main app now includes saved profiles, lifecycle reconnect and fullscreen/keyboard controls; the branch also preserves their earlier implementation. Reuse suitable owned components while
 replacing the WebView protocol/UI runtime.
 
 The owner's immediate priority is a performance comparison before expanding the
@@ -50,9 +48,31 @@ Measure displayed frame rate and latency separately from decode-only throughput.
 A native rewrite removes bridge overhead but does not by itself guarantee a
 particular frame rate.
 
-## Current status
+## Current status (2026-11-11)
 
-Dependency pinned, architecture chosen and isolated video comparison implemented.
-The shipping app still uses noVNC;
-no native LibVNCClient session has been built or tested yet. Existing native
-HEVC decoder results remain valid evidence for that component only.
+Native 0.10 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
+Mac login, live 1920×1080 Standard updates, relative pointer input and two-finger
+scrolling. Synthetic/device regressions cover Apple RSA/AES auth, fragmented
+reads, exact native pixels, cursor, pipeline request ordering and wheel packets.
+It also has full-screen controls, native pinch zoom, pointer-follow panning and
+adjustable scroll speed; real Mac zoom feedback is pending. See HANDOFF.md and
+native-client-galaxy-s26.json for current validation and limitations.
+
+Owner's next requested milestone is High Performance. The existing hybrid has
+verified ~60+ FPS HP streaming using native FFmpeg, but the native protocol app
+still lacks its negotiation and media transport. Integration requires:
+
+1. Retain the auth AES key only for the session, then implement encrypted Apple
+   control records and enhanced 3.889 session setup. Add deterministic vectors and
+   synthetic session tests; zero keys on close and never log them.
+2. Port HP offer/answer and virtual-display handling from owned ard/hp reference.
+3. Receive UDP directly, authenticate/decrypt SRTP, assemble HEVC stripes and send
+   RTCP feedback. Test loss, reordering, wraparound and malformed bounded input.
+4. Link/reuse the existing native stripe decoder/compositor, keeping direct byte
+   buffers and shared viewport/cursor geometry. Replay the existing fixtures.
+5. Verify actual Mac streaming, stalls/recovery, Surface loss and return from
+   another app on Galaxy. Preserve Standard fallback and working hybrid app.
+
+Apple clipboard, secure native profiles/reconnect and advanced keyboard are still
+pending. Release stays on hold until owner selects a base. Native architecture
+removes the bridge but does not by itself guarantee improved performance.

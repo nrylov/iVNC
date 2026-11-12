@@ -36,7 +36,8 @@ public final class PasswordMaskInstrumentation extends Instrumentation {
                     event.invoke(target,"status","Native connection ended");
                     Field status=NativeActivity.class.getDeclaredField("status");status.setAccessible(true);
                     require(((android.widget.TextView)status.get(target)).getText().toString().equals("first synthetic error"),"Specific error was overwritten");
-                    target.findViewById(android.R.id.content).findViewWithTag("native-debug-log").performClick();
+                    require(target.findViewById(android.R.id.content).findViewWithTag("native-viewer-menu")!=null,"Viewer menu missing");
+                    java.lang.reflect.Method action=NativeActivity.class.getDeclaredMethod("viewerAction",String.class);action.setAccessible(true);action.invoke(target,"log");
                     Field logDialog=NativeActivity.class.getDeclaredField("debugDialog");logDialog.setAccessible(true);
                     android.app.AlertDialog dialog=(android.app.AlertDialog)logDialog.get(target);
                     android.widget.TextView log=dialog.findViewById(android.R.id.content).findViewWithTag("native-debug-text");

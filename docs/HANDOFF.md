@@ -1,3 +1,56 @@
+# Native pinch zoom and fullscreen controls — 2026-11-11
+
+Owner prioritizes native zoom and better layout/UX, then explicitly asks for
+High Performance mode afterward. Native 0.10-native-zoom is built/installed and
+opened on Galaxy. Working hybrid remains untouched; release remains ON HOLD.
+
+Viewer now hides system bars and removes the permanent toolbar during a session.
+One translucent 48dp bottom-right ⋮ button opens connection, zoom in/out, fit,
+scroll sensitivity, gesture help and disconnect. Diagnostics submenu holds the
+existing Pipeline toggle and Debug log. Insets keep the button away from system
+navigation/cutouts; system bars can be temporarily revealed by swiping. Connecting
+and errors remain visible in a banner. Password masking and full log remain.
+
+DesktopViewport owns shared aspect-fit/zoom/pan geometry for TextureView, cursor
+and pointer sensitivity. Pinch zoom is 1–8x fit, anchored at the finger focus;
+pinch translation pans locally. One-finger relative input follows the cursor near
+viewport edges when zoomed, so reaching hidden desktop areas needs no separate
+pan gesture. Fit resets zoom/pan; zoom +/- also available in ⋮. Current zoom is
+shown in the menu. Portrait/landscape bounds keep fitted axes centered.
+
+NativeTrackpad now consumes all contacts from a MotionEvent atomically. Two-
+finger gestures lock to scrolling or pinch after movement/span thresholds, so
+pinch never sends wheel events and releasing one contact never jumps/clicks.
+Scroll tuning stays 12x default with existing saved custom settings preserved.
+Per-event wheel bursts remain bounded. Native does not yet have saved login,
+background reconnect, advanced keyboard, Apple clipboard or HP.
+
+Validation:
+- Project-local APK build PASS; host gesture/viewport/log tests PASS: focal zoom,
+  limits/letterboxing, bounded pan, pointer following, pinch isolation and normal
+  sequential scroll sensitivity.
+- Galaxy ViewerUxInstrumentation PASS using synthetic desktop: actual multi-touch
+  MotionEvents, 1.4x then 2.1x zoom, actual TextureView Matrix matching viewport,
+  hidden connected toolbar and floating menu. App-only PixelCopy capture visually
+  reviewed. No Mac connection or credentials used by this test.
+- Galaxy cursor geometry/drawing/stacking/visibility PASS; password masking/state,
+  first error retention, Debug log history/Copy binding/Clear PASS.
+- Initial fullscreen onCreate startup test caught controller-before-window setup;
+  fixed by applying immersive flags after attachment/focus. All reruns pass.
+- No protocol/C changes; prior native protocol/wheel tests remain the baseline.
+No real Mac zoom/UX verification yet. Owner asked to try pinch, pointer-follow,
+floating menu and two-finger scrolling on actual session; awaiting feedback.
+
+Next milestone, per owner: native High Performance. Reuse existing owned FFmpeg
+stripe decoder/compositor and synthetic HEVC samples. Native AppleAuth currently
+wipes its AES key after building credentials; first preserve it in session-scoped
+storage for encrypted control records, with zeroization on close. Then port Apple
+3.889 flags/session setup + HP negotiation, direct UDP/SRTP/HEVC RTP assembly and
+feedback into native path, feeding decoder bytes without WebView/base64. Existing
+ard/hp modules and tests are reference; do not mistake linking a decoder for live
+HP support. Keep Standard fallback and verify live stream plus background/Surface
+ownership before claiming HP works. See docs/NATIVE-CLIENT.md.
+
 # Native scroll default tuned to 12x — 2026-11-11
 
 Owner says 0.8 scrolling is better but wants it a little faster. Native 0.9 raises

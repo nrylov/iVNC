@@ -3,7 +3,6 @@ package dev.ivnc.nativeclient;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -15,10 +14,7 @@ final class ScrollSettings {
     static int savedSpeed(Activity activity){
         return Math.max(1,Math.min(24,activity.getSharedPreferences(PREFERENCES,0).getInt(KEY,NativeTrackpad.DEFAULT_SCROLL_SPEED)));
     }
-    static void attach(Activity activity,LinearLayout actions,IntConsumer changed){
-        Button button=new Button(activity);button.setText("Scroll");button.setTextSize(12);button.setContentDescription("Scroll sensitivity");
-        actions.addView(button,new LinearLayout.LayoutParams(0,-2,1));
-        button.setOnClickListener(view->{
+    static void show(Activity activity,IntConsumer changed){
             LinearLayout content=new LinearLayout(activity);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(24,16,24,8);
             TextView label=new TextView(activity);int initial=savedSpeed(activity);label.setText("Scroll speed: "+initial+"×");content.addView(label);
             SeekBar slider=new SeekBar(activity);slider.setMax(23);slider.setProgress(initial-1);content.addView(slider);
@@ -32,6 +28,5 @@ final class ScrollSettings {
                 .setPositiveButton("Save",(dialog,which)->{
                     int value=slider.getProgress()+1;activity.getSharedPreferences(PREFERENCES,0).edit().putInt(KEY,value).apply();changed.accept(value);
                 }).show();
-        });
     }
 }

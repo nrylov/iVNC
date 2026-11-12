@@ -37,7 +37,7 @@
   "highPerformance": "Not yet ported",
   "appleClipboard": "Not yet ported",
   "release": "On hold by owner until native is evaluated",
-  "appVersion": "0.9-native-scroll-tuned",
+  "appVersion": "0.10-native-zoom",
   "realMacPublicKeyProbe": {
     "passed": true,
     "credentialsSent": false,
@@ -72,5 +72,16 @@
       "previousDpPerWheelTick": 24,
       "hostRegressions": "PASS: twelvefold baseline swipe output, bounded bursts, tap jitter"
     }
-  }
+  },
+  "nativeZoom": {
+    "range": "1–8x aspect fit",
+    "pinch": "Local focal zoom, exclusive with scrolling",
+    "navigation": "One-finger trackpad with pointer-follow panning at viewport edges",
+    "controls": "Fullscreen with translucent floating menu; diagnostics in submenu",
+    "hostGeometryAndGestureTests": "PASS",
+    "galaxyActualMotionEventAndTextureMatrixTest": "PASS",
+    "appOnlySyntheticVisualReview": "PASS",
+    "realMacOwnerTest": "Awaiting feedback"
+  },
+  "nextOwnerPriority": "High Performance native session/transport integration after zoom/UX"
 }

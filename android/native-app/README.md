@@ -5,7 +5,7 @@ C++ socket/protocol/framebuffer path, and platform Java cryptography for Apple's
 RSA type-33 login. No WebView, JavaScript, noVNC or AVNC app/UI code is packaged.
 
 Package `dev.ivnc.nativeclient` installs alongside the working hybrid client.
-This first experiment implements Standard RFB rendering and basic relative mouse
+This first experiment implements Standard RFB rendering and relative mouse
 input, plus two-finger scrolling and two-finger tap to right-click. Apple High Performance, Apple clipboard, keyboard extensions, secure
 profile persistence and lifecycle reconnection are not integrated here yet.
 It is not feature-equivalent to the working client and is not a release candidate.
@@ -123,3 +123,23 @@ Mac feel at the new default is awaiting owner feedback.
 
 0.9 raises the default to **12×** (2dp per wheel tick), 50% faster than 0.8,
 after owner feedback. An explicitly saved slider value remains in effect.
+
+
+## Fullscreen viewer and zoom (0.10)
+
+The desktop uses the whole app window, with a translucent **⋮** button in the
+bottom-right corner. Its menu contains connection controls, zoom in/out, **Fit
+desktop**, scroll sensitivity and gesture help. Pipeline and Debug log live under
+**Diagnostics**. System bars are hidden during viewing and can be revealed by
+swiping from an edge. Errors remain visible.
+
+Pinch to zoom from fit to 8×, keeping the desktop under your fingers stable.
+Moving two fingers together scrolls the Mac. The gesture locks to zoom or scroll
+until fingers lift. With one finger, use the screen as a trackpad; when the cursor
+approaches the visible edge while zoomed, the view follows automatically. Cursor
+and video use the same transform. **Fit desktop** restores the entire desktop.
+Zoom is local and does not change the Mac's resolution.
+
+Host geometry/gesture tests and real Galaxy synthetic UX/cursor/password tests
+pass. Actual Mac zoom and navigation are awaiting owner feedback. High Performance
+mode is the next requested milestone and is not implemented in the native app yet.

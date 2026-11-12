@@ -13,6 +13,8 @@ final class CursorOverlay extends View {
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private int frameWidth=1,frameHeight=1;
     private float remoteX,remoteY;
+    private DesktopViewport viewport;
+    void viewport(DesktopViewport value){viewport=value;invalidate();}
     CursorOverlay(Context context){
         super(context);setClickable(false);setFocusable(false);setTag("native-cursor");
         arrow.moveTo(0,0);arrow.lineTo(0,21);arrow.lineTo(5,16);arrow.lineTo(10,25);
@@ -26,7 +28,8 @@ final class CursorOverlay extends View {
         super.onDraw(canvas);
         float scale=ViewportMath.scale(getWidth(),getHeight(),frameWidth,frameHeight);
         if(scale<=0)return;
-        canvas.save();canvas.translate(ViewportMath.x(getWidth(),frameWidth,scale,remoteX),ViewportMath.y(getHeight(),frameHeight,scale,remoteY));
+        canvas.save();canvas.translate(viewport==null?ViewportMath.x(getWidth(),frameWidth,scale,remoteX):viewport.x(remoteX),
+            viewport==null?ViewportMath.y(getHeight(),frameHeight,scale,remoteY):viewport.y(remoteY));
         float density=getResources().getDisplayMetrics().density;canvas.scale(density,density);
         paint.setColor(0xff080c12);paint.setStyle(Paint.Style.STROKE);paint.setStrokeJoin(Paint.Join.ROUND);paint.setStrokeWidth(3);canvas.drawPath(arrow,paint);
         paint.setColor(0xfffcfcfc);paint.setStyle(Paint.Style.FILL);canvas.drawPath(arrow,paint);canvas.restore();

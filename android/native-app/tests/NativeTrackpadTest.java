@@ -11,6 +11,7 @@ public final class NativeTrackpadTest {
         public void move(float x,float y){actions.add("move:"+x+","+y);}
         public void click(int button){actions.add("click:"+button);}
         public void wheel(int mask){actions.add("wheel:"+mask);}
+        public void zoom(float factor,float x,float y,float dx,float dy){actions.add("zoom");}
     });
     public static void main(String[] args){new NativeTrackpadTest().run();}
     private void run(){
@@ -28,16 +29,24 @@ public final class NativeTrackpadTest {
         require(actions.isEmpty(),"Three-finger gesture emitted input");
         pad.down(1,0,0,0);pad.cancel();pad.move(1,100,100);pad.up(1,50);require(actions.isEmpty(),"Cancelled gesture emitted input");
         actions.clear();pad.setScrollSpeed(NativeTrackpad.DEFAULT_SCROLL_SPEED);scroll(0,48);
-        require(actions.size()==24&&actions.stream().allMatch("wheel:8"::equals),"Default swipe should scroll twelve times farther than 1x");
+        require(actions.size()==16&&actions.stream().allMatch("wheel:8"::equals),"Default swipe should reach the bounded event limit at high sensitivity");
         actions.clear();pad.setScrollSpeed(24);scroll(0,10000);
         require(actions.size()<=32,"Large input generated an unbounded wheel burst");
         actions.clear();pad.setScrollSpeed(8);pad.down(1,0,0,0);pad.down(2,50,0,1);
         pad.move(1,0,2);pad.move(2,50,2);pad.up(2,20);pad.up(1,30);
         require(actions.equals(List.of("click:4")),"Small two-finger tap jitter scrolled at high sensitivity");
+        actions.clear();pad.down(1,0,0,0);pad.down(2,50,0,1);
+        pad.moveContacts(new int[]{1,2},new float[]{-20,70},new float[]{0,0});
+        pad.up(2,100);pad.move(1,30,30);pad.up(1,110);
+        require(actions.equals(List.of("zoom")),"Pinch scrolled/clicked/moved remote pointer");
+        actions.clear();pad.setScrollSpeed(12);pad.down(1,0,0,0);pad.down(2,50,0,1);
+        for(int y=12;y<=48;y+=12)pad.moveContacts(new int[]{1,2},new float[]{0,50},new float[]{y,y});
+        pad.up(2,100);pad.up(1,110);
+        require(actions.size()==24&&actions.stream().allMatch("wheel:8"::equals),"Normal scroll sensitivity changed while adding pinch");
         System.out.println("PASS: relative pointer, taps, four wheel directions, multi-touch lift suppression, three-finger suppression and cancellation");
     }
     private void scroll(float dx,float dy){
-        pad.down(1,0,0,0);pad.down(2,50,0,1);pad.move(1,dx,dy);pad.move(2,50+dx,dy);
+        pad.down(1,0,0,0);pad.down(2,50,0,1);pad.moveContacts(new int[]{1,2},new float[]{dx,50+dx},new float[]{dy,dy});
         pad.up(2,60);pad.move(1,dx+100,dy+100);pad.up(1,70);
     }
     private static void require(boolean value,String message){if(!value)throw new AssertionError(message);}

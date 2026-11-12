@@ -24,6 +24,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private final Object lifetime=new Object();
     private long handle;
     private TextureView texture;
+    private final DesktopViewport viewport=new DesktopViewport();
     private CursorOverlay cursor;
     private android.widget.ToggleButton pipeline;
     private boolean connected,touchActive;
@@ -32,7 +33,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private Surface surface;
     private TextView status;
     private DebugLog debugLog;
-    private AlertDialog debugDialog;
+    private AlertDialog debugDialog,connectionPanel;
     private int width=1920,height=1080;
     private float cursorX=960,cursorY=540;
     private NativeTrackpad trackpad;
@@ -40,6 +41,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private EditText host,port,user,password;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
+        getWindow().setDecorFitsSystemWindows(false);
         String version="unknown";
         try{version=getPackageManager().getPackageInfo(getPackageName(),0).versionName;}catch(android.content.pm.PackageManager.NameNotFoundException ignored){}
         debugLog=new DebugLog("iVNC Native "+version+" · "+android.os.Build.MANUFACTURER+" "+android.os.Build.MODEL+
@@ -49,33 +51,29 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         texture=new TextureView(this);texture.setSurfaceTextureListener(this);
         root.addView(texture,new FrameLayout.LayoutParams(-1,-1));
         cursor=new CursorOverlay(this);cursor.setVisibility(View.INVISIBLE);root.addView(cursor,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout bar=new LinearLayout(this);bar.setOrientation(LinearLayout.VERTICAL);bar.setBackgroundColor(0xd0101b2a);
-        status=new TextView(this);status.setTag("native-status");status.setText("Native LibVNCClient experiment — Standard mode");bar.addView(status);
-        Button connection=new Button(this);connection.setText("Connection");connection.setOnClickListener(v->connectionDialog());
-        Button log=new Button(this);log.setText("Debug log");log.setTag("native-debug-log");log.setOnClickListener(v->showDebugLog());
-        LinearLayout actions=new LinearLayout(this);actions.addView(connection,new LinearLayout.LayoutParams(0,-2,1));
-        actions.addView(log,new LinearLayout.LayoutParams(0,-2,1));
-        pipeline=new android.widget.ToggleButton(this);pipeline.setTextOn("Pipeline on");pipeline.setTextOff("Pipeline off");pipeline.setChecked(true);pipeline.setTextSize(12);
-        pipeline.setTag("native-pipeline");pipeline.setContentDescription("Pipeline framebuffer update requests");
+        cursor.viewport(viewport);
+        status=new TextView(this);status.setTag("native-status");status.setText("Disconnected");status.setVisibility(View.GONE);status.setPadding(20,40,20,12);status.setBackgroundColor(0xcc101b2a);root.addView(status,new FrameLayout.LayoutParams(-1,-2));
+        pipeline=new android.widget.ToggleButton(this);pipeline.setChecked(true);
         pipeline.setOnCheckedChangeListener((button,enabled)->{
             synchronized(lifetime){if(handle!=0)NativeRfb.pipeline(handle,enabled);}
             debugLog.add("status","Update request pipeline "+(enabled?"enabled":"disabled")+" for subsequent updates");
         });
-        actions.addView(pipeline,new LinearLayout.LayoutParams(0,-2,1));bar.addView(actions);
-        ScrollSettings.attach(this,actions,speed->{if(trackpad!=null)trackpad.setScrollSpeed(speed);});
-        root.addView(bar,new FrameLayout.LayoutParams(-1,-2));
+        ViewerControls.attach(this,root,()->(connected?"Connected":"Disconnected")+" · "+Math.round(viewport.zoom()*100)+"%",pipeline::isChecked,this::viewerAction);
         trackpad=new NativeTrackpad(getResources().getDisplayMetrics().density,new NativeTrackpad.Output(){
             public void move(float dx,float dy){
-                float scale=Math.max(.01f,ViewportMath.scale(texture.getWidth(),texture.getHeight(),width,height));
+                float scale=Math.max(.01f,viewport.scale());
                 cursorX=Math.max(0,Math.min(width-1,cursorX+dx/scale));
                 cursorY=Math.max(0,Math.min(height-1,cursorY+dy/scale));pointer(0);
+            }
+            public void zoom(float factor,float x,float y,float dx,float dy){
+                viewport.zoomBy(factor,x-dx,y-dy);viewport.panBy(dx,dy);applyViewport();
             }
             public void click(int button){pointer(button);pointer(0);}
             public void wheel(int mask){synchronized(lifetime){if(handle!=0)NativeRfb.wheel(handle,(int)cursorX,(int)cursorY,mask);}}
         });
         trackpad.setScrollSpeed(ScrollSettings.savedSpeed(this));
         texture.setOnTouchListener(this::touch);
-        setContentView(root);
+        setContentView(root);root.post(()->ViewerControls.immersive(this));
         host=field("Mac address",InputType.TYPE_CLASS_TEXT);port=field("Port",InputType.TYPE_CLASS_NUMBER);port.setText("5900");
         user=field("Mac username",InputType.TYPE_CLASS_TEXT);password=field("Mac password",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
         password.setTransformationMethod(android.text.method.PasswordTransformationMethod.getInstance());
@@ -104,10 +102,10 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         for(EditText input:new EditText[]{host,port,user,password}){
             if(input.getParent()!=null)((android.view.ViewGroup)input.getParent()).removeView(input);fields.addView(input);
         }
-        new AlertDialog.Builder(this).setTitle("iVNC Native experiment").setView(fields)
-            .setMessage("Separate test app. Apple High Performance and clipboard extensions are not integrated yet.")
+        connectionPanel=new AlertDialog.Builder(this).setTitle("Connect to your Mac").setView(fields)
+            .setMessage("Standard mode · macOS Screen Sharing").setCancelable(true)
             .setPositiveButton("Connect",(dialog,which)->connect()).setNeutralButton("Disconnect",(dialog,which)->stop())
-            .setNegativeButton("Cancel",null).show();
+            .setNegativeButton("Cancel",null).create();connectionPanel.show();
     }
     private void connect(){
         if(surface==null){status.setText("Display is not ready; try Connect again");return;}
@@ -141,18 +139,34 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         if(kind.equals("error")){if(errorShown)return;errorShown=true;}
         else if(kind.equals("status")&&value.startsWith("Connecting"))errorShown=false;
         else if(kind.equals("status")&&errorShown)return;
+        status.setVisibility(connected&&!errorShown?View.GONE:View.VISIBLE);
         if(kind.equals("size")){
             String[] size=value.split(",");width=Integer.parseInt(size[0]);height=Integer.parseInt(size[1]);
-            cursorX=width/2f;cursorY=height/2f;fit();
+            cursorX=width/2f;cursorY=height/2f;viewport.reset();fit();
         }else if(kind.equals("frames")){if(connected)cursor.setVisibility(View.VISIBLE);status.setText("Native Standard · "+value+" Surface posts");}
         else status.setText(value);
     }
-    private void fit(){
-        if(width<1||height<1||texture.getWidth()<1||texture.getHeight()<1)return;
-        float scale=ViewportMath.scale(texture.getWidth(),texture.getHeight(),width,height);
+    private void viewerAction(String action){
+        switch(action){
+            case "connection":connectionDialog();break;
+            case "log":showDebugLog();break;
+            case "pipeline":pipeline.setChecked(!pipeline.isChecked());break;
+            case "scroll":ScrollSettings.show(this,speed->trackpad.setScrollSpeed(speed));break;
+            case "disconnect":stop();break;
+            case "fit":viewport.reset();applyViewport();break;
+            case "zoom-in":case "zoom-out":
+                viewport.zoomBy(action.equals("zoom-in")?1.4f:1/1.4f,texture.getWidth()/2f,texture.getHeight()/2f);applyViewport();break;
+            case "help":new AlertDialog.Builder(this).setTitle("Desktop gestures")
+                .setMessage("Slide one finger to move the pointer. Tap to click.\n\nSlide two fingers together to scroll; tap with two fingers to right-click.\n\nPinch to zoom. When zoomed in, the view follows your pointer near its edges—keep using one finger to reach the rest of the desktop.\n\nUse Fit desktop to show the whole screen.")
+                .setPositiveButton("Done",null).show();break;
+        }
+    }
+    private void fit(){viewport.resize(texture.getWidth(),texture.getHeight(),width,height);applyViewport();}
+    private void applyViewport(){
+        if(texture.getWidth()<1||texture.getHeight()<1)return;
         android.graphics.Matrix transform=new android.graphics.Matrix();
-        transform.setScale(width*scale/texture.getWidth(),height*scale/texture.getHeight(),texture.getWidth()/2f,texture.getHeight()/2f);
-        texture.setTransform(transform);updateCursor();
+        transform.setScale(viewport.imageWidth()/texture.getWidth(),viewport.imageHeight()/texture.getHeight());
+        transform.postTranslate(viewport.left(),viewport.top());texture.setTransform(transform);updateCursor();
     }
     private void updateCursor(){cursor.position(width,height,cursorX,cursorY);}
     private boolean touch(View view,MotionEvent event){
@@ -160,18 +174,21 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
             touchActive=true;trackpad.down(event.getPointerId(index),event.getX(index),event.getY(index),event.getEventTime());
         }else if(action==MotionEvent.ACTION_MOVE){
-            for(int i=0;i<event.getPointerCount();i++)trackpad.move(event.getPointerId(i),event.getX(i),event.getY(i));
+            int count=event.getPointerCount();int[] ids=new int[count];float[] xs=new float[count],ys=new float[count];
+            for(int i=0;i<count;i++){ids[i]=event.getPointerId(i);xs[i]=event.getX(i);ys[i]=event.getY(i);}
+            trackpad.moveContacts(ids,xs,ys);
         }else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_POINTER_UP){
             trackpad.up(event.getPointerId(index),event.getEventTime());touchActive=action!=MotionEvent.ACTION_UP;
         }else if(action==MotionEvent.ACTION_CANCEL){trackpad.cancel();touchActive=false;}
         return true;
     }
-    private void pointer(int buttons){lastLocalPointerAt=android.os.SystemClock.uptimeMillis();updateCursor();synchronized(lifetime){if(handle!=0)NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons);}}
+    private void pointer(int buttons){lastLocalPointerAt=android.os.SystemClock.uptimeMillis();viewport.follow(cursorX,cursorY);applyViewport();synchronized(lifetime){if(handle!=0)NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons);}}
     private void stop(){connected=false;touchActive=false;if(trackpad!=null)trackpad.cancel();if(cursor!=null)cursor.setVisibility(View.INVISIBLE);synchronized(lifetime){if(handle!=0)NativeRfb.stop(handle);}}
     @Override public void onSurfaceTextureAvailable(SurfaceTexture value,int width,int height){surface=new Surface(value);fit();}
     @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture value){stop();if(surface!=null)surface.release();surface=null;return true;}
     @Override public void onSurfaceTextureSizeChanged(SurfaceTexture value,int width,int height){fit();}
     @Override public void onSurfaceTextureUpdated(SurfaceTexture value){}
+    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)ViewerControls.immersive(this);}
     @Override protected void onPause(){stop();super.onPause();}
     @Override protected void onDestroy(){stop();worker.shutdown();super.onDestroy();}
 }

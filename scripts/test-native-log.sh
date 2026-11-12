@@ -10,3 +10,8 @@ java -cp "$OUT" dev.ivnc.nativeclient.DebugLogTest
 javac -d "$OUT" "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativeclient/NativeTrackpad.java" \
   "$PROJECT_ROOT/android/native-app/tests/NativeTrackpadTest.java"
 java -cp "$OUT" dev.ivnc.nativeclient.NativeTrackpadTest
+
+javac -d "$OUT" "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativeclient/ViewportMath.java" \
+  "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativeclient/DesktopViewport.java" \
+  "$PROJECT_ROOT/android/native-app/tests/DesktopViewportTest.java"
+java -cp "$OUT" dev.ivnc.nativeclient.DesktopViewportTest
