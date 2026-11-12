@@ -95,10 +95,14 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
             while(running){
                 {std::deque<Pointer> commands;{std::lock_guard<std::mutex> guard(inputMutex);commands.swap(input);}
                     for(const auto& p:commands){
+                        if(p.clipboardAction){if(!sendAppleClipboard(this,p.clipboardAction,p.clipboard)){running=false;break;}continue;}
                         if(!p.keys.empty()){if(!sendKeyboard(this,p.keys)){running=false;break;}continue;}
                         int buttons=appleProtocol?(p.buttons&~6)|((p.buttons&4)>>1)|((p.buttons&2)<<1):p.buttons;
                         if(!SendPointerEvent(client,p.x,p.y,buttons)){running=false;break;}
                     }}
+                bool refresh=refreshRequested.exchange(false);
+                if(refreshRetryAtMs&&clockNs(CLOCK_MONOTONIC)/1000000>=refreshRetryAtMs){refreshRetryAtMs=0;refresh=true;}
+                if(refresh&&!refreshDesktop(this,false)){emit("error","Desktop refresh request failed");break;}
                 uint64_t waiting=clockNs(CLOCK_MONOTONIC);
                 int ready=WaitForMessage(client,10000);
                 socketWaitNs+=clockNs(CLOCK_MONOTONIC)-waiting;
@@ -115,6 +119,7 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
         }
     }
     env->CallVoidMethod(tunnel,env->GetMethodID(tunnelClass,"close","()V"));
+    std::fill(clipboardOutgoing.begin(),clipboardOutgoing.end(),0);clipboardOutgoing.clear();
     std::fill(decrypted.begin(),decrypted.end(),0);decrypted.clear();decryptedOffset=0;
     socket=-1;
     if(window){ANativeWindow_release(window);window=nullptr;}

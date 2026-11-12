@@ -1,3 +1,117 @@
+# RESTART CHECKPOINT: saved sessions / refresh / clipboard WIP — 2026-11-12
+
+Owner needs to restart Codex. This is a deliberate source checkpoint, not a
+finished feature release. Active repository is /Users/nikolairylov/Repositories/iVNC
+(GitHub nrylov/iVNC), NOT the environment cwd newserver. Single agent only. Work
+continues on wip/native-sessions-clipboard. Main/last shipped source is 8957917;
+phone remains on working Native 0.14-native-drag. Do not install WIP until device
+regressions below are implemented and pass. Release remains ON HOLD by owner.
+
+Current owner requests, in order:
+1. Fix black areas on initial connection that fill only when the cursor moves.
+2. Save connection details/auth securely, reconnect when returning from another
+   app, and restore bidirectional clipboard in the native client.
+Owner confirmed 0.14 dragging works and 0.13 keyboard works. Native enhanced
+Standard 0.12 materially improved smoothness (roughly 80–140 Surface posts/sec in
+owner log, not physical display FPS). HP remains a later requested milestone;
+these new essentials are the immediate task. Keep working hybrid untouched.
+
+Implemented so far (WIP):
+- Full nonincremental refresh after encryption activation and DisplayInfo2, plus
+  one 50ms retry on the native loop. Earlier first full request was plaintext and
+  post-encryption path only subscribed to deltas, likely leaving missing baseline
+  areas. Added refreshDesktop helper and manual Refresh desktop menu action.
+  Actual Mac fix is NOT yet verified.
+- Copied owned ProfileStore into native package, unique native preferences/key
+  aliases. AES-256-GCM Android Keystore, unlocked-device-required, backups already
+  disabled. ConnectionProfile encapsulates host/port/user/password/mode; no private
+  fields in toString/logs. SavedConnection serial storage worker orders save and
+  Forget; save on first presented frame, not failed authentication. Remember is
+  checked by default; saved password is reused only for matching host/port/user,
+  stays out of EditText (hint only), and Forget deletes preferences/key.
+- NativeConnection owns worker/handle, generation/epoch and Surface lifetime.
+  Pausing stops current session but retains wanted profile; resume + valid Surface
+  creates a new one. Stale callbacks are ignored. Manual Disconnect clears resume
+  intent. Saved resume flag allows cold return, disabled on manual disconnect or
+  auth rejection. Surface release is queued behind the native worker, not released
+  under a running session. Network retry while continuously foreground is not yet
+  implemented (not explicitly needed for app-switch request).
+- NativeActivity integrated SavedConnection/NativeConnection, reconnect callbacks,
+  Remember/Forget UI, saved login hints, same-size viewport retention and startup
+  loading banner until a frame. Default saved profile auto-connects on launch if
+  resume flag set. Android clipboard wired only when focused and full Apple tunnel
+  active; on pause it unregisters/unreadies.
+- Apple encrypted clipboard native framing + zlib, bounded to 1MiB text; native
+  input queue includes clipboard actions 1=enable+request, 2=request, 3=send. Pending
+  sends coalesce; no clipboard payload in logs. Mac state-change 2 requests current
+  pasteboard; 3 resends last outgoing. New NativeRfb.Events default clipboard(byte[])
+  callback bypasses diagnostic String channel. ApplePasteboard parses UTF-8 only.
+  ClipboardSync echo suppression uses fingerprints; a phone copy while away is
+  sent before starting Mac sync on return. First connection requests Mac text.
+  Added Get Mac clipboard / Send phone clipboard menu items. Compatibility mode
+  clipboard intentionally unavailable; enhanced encrypted Apple mode is required.
+
+CRITICAL test privacy boundary introduced:
+- All native UI instrumentation launching NativeActivity now passes intent extra
+  ivnc.synthetic=true, honored only in debuggable builds. This selects separate
+  native-profile-test / ivnc.native.profile.v1-test namespaces and disables saved
+  auto-launch. ClipboardSync.memory() is used instead of global Android clipboard.
+  NEVER launch tests against real saved owner profiles, read credentials, capture
+  real desktop, or read/write the owner's phone clipboard from tools. Use synthetic
+  servers and app-only PixelCopy captures; whole-display captures can include PIP.
+- Copied native ProfileStoreInstrumentation uses another dedicated synthetic
+  namespace (ivnc-profile-test / ivnc.profile.integration-test), also not owner data.
+
+Validation at checkpoint:
+- Project-local scripts/build-native-client.sh PASS on latest source; log at ignored
+  .dev/native-session-checkpoint-build.txt. APK version 0.15-native-sessions-clipboard
+  exists but has NOT been installed. Keep phone 0.14 until testing complete.
+- scripts/test-native-log.sh PASS including new ClipboardSyncTest: UTF-8 binary
+  roundtrip/limits, malformed bounds, no clipboard echo, no background reads and
+  changed phone clipboard priority after reconnect. Uses fake clipboard ports and
+  Android jar only as compile/runtime stubs, no Android methods invoked in host test.
+- Native 0.15 device tests have NOT been run yet. Existing synthetic server/tests
+  still need coverage/extensions for the new full-refresh/clipboard/reconnect path.
+
+Concrete next work:
+1. Extend SyntheticRfbServer with an initially partial image and fill remaining
+   pixels only after an encrypted nonincremental full request. Confirm entire
+   ImageReader frame becomes correct without any pointer movement; test 50ms retry
+   and geometry changes. Existing enhanced peer accepts full requests already.
+2. Add synthetic native clipboard server receive/send (types 21/11/31); assert
+   session id, zlib/pasteboard UTF-8, both directions and state-change request.
+   NativeIntegrationInstrumentation should override Events.clipboard to collect
+   synthetic payloads, never write the real Android clipboard.
+3. Run native ProfileStoreInstrumentation on Galaxy. Add actual NativeActivity
+   saved-login + pause/resume test using ivnc.synthetic=true and fake credentials.
+   SyntheticRfbServer currently accepts only ONE session: add a reconnect loop
+   with compressor/cipher reset and accepted/authenticated session counters, or
+   proxy multiple instances behind a test listener. Assert second session starts
+   without re-entering text and manual Disconnect prevents resume. Verify saved
+   password stays empty in EditText and Forget prevents future automatic reuse.
+4. Rerun keyboard, zoom/render-guard, cursor, masking/debug and plain/enhanced native
+   protocol tests after controller refactor. Inspect INSTRUMENTATION_CODE -1 and
+   PASS (adb am instrument exit code alone does not prove success).
+5. Review race/UX edges: queued save vs Forget, early-background queued connect,
+   old ended callbacks, Surface destruction/recreation, credential failure stops
+   automatic return attempts, focus changes do not read clipboard in background.
+6. Install tested 0.15; ask owner to verify first complete image, remembered login,
+   switch-away/back reconnect and clipboard directions. Update handoff/evidence,
+   commit/push on main only when milestone validated; preserve release hold.
+
+Tools/environment reminders:
+- Project-local SDK/JDK/Gradle/NDK under .dev; source scripts/env.sh. ADB wrapper
+  scripts/device.sh uses dedicated port 5048; ~/.android pairing keys owner-approved.
+- Galaxy selector adb-RFGL123YQQH-F5OiYw._adb-tls-connect._tcp. Last online endpoint
+  192.168.50.27:34857; port changes. Use devices/mdns, ask connection IP:port only if
+  discovery fails. No fresh pairing usually needed.
+- iVNC writes/build/device/network require exec_command require_escalated because
+  writable workspace points at unrelated newserver. Approval is normally automatic.
+- Never change the other agent's Mac GUI. No subagents. Use set -e for shell batches.
+- For Python edits, read EACH file afresh into distinct variables; reusing a prior
+  file's source accidentally overwrote native-jni twice earlier (caught/fixed before
+  install). Build and inspect results; do not install stale APK after build failure.
+
 # Native dragging and text selection — 2026-11-12
 
 Owner confirms the dedicated 0.13 keyboard works well, then requests dragging /

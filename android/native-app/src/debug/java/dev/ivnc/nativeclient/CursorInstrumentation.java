@@ -19,7 +19,7 @@ public final class CursorInstrumentation extends Instrumentation {
     @Override public void onStart(){
         Bundle result=new Bundle();NativeActivity activity=null;
         try {
-            activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).putExtra("ivnc.synthetic",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             final NativeActivity target=activity;AtomicReference<Throwable> failure=new AtomicReference<>();
             runOnMainSync(()->{try{
                 checkGeometry(800,600,1920,1080,400,300,0,75);

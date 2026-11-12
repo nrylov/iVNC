@@ -5,15 +5,17 @@ import android.view.Surface;
 
 /** Native socket/protocol/render lifetime, with queued input and UI-only callbacks. */
 final class NativeRfb {
-    interface Events { void event(String kind,String value); }
+    interface Events { void event(String kind,String value);default void clipboard(byte[] payload){} }
     static { System.loadLibrary("ivncrfb"); }
     static native long create(Events events);
     static native void run(long handle,String host,int port,String username,String password,Surface surface);
     static native void stop(long handle);
     static native void destroy(long handle);
+    static native void refresh(long handle);
     static native void enhanced(long handle,boolean enabled);
     static native void encryption(long handle,boolean enabled);
     static native void pipeline(long handle,boolean enabled);
+    static native boolean clipboard(long handle,int action,byte[] payload);
     static native boolean keys(long handle,int[] events);
     static native void wheel(long handle,int x,int y,int mask);
     static native void pointer(long handle,int x,int y,int buttons);

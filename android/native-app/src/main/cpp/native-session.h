@@ -27,9 +27,13 @@ struct NativeSession {
     bool frameDirty=false;
     std::atomic<int> socket{-1};
     std::mutex inputMutex;
-    struct Pointer {int x,y,buttons;std::vector<int32_t> keys;bool motion=false;};
+    struct Pointer {int x,y,buttons;std::vector<int32_t> keys;bool motion=false;int clipboardAction=0;std::vector<uint8_t> clipboard;};
     std::deque<Pointer> input;
     int submittedButtons=0;
+    std::atomic<bool> refreshRequested{false};
+    uint64_t refreshRetryAtMs=0;
+    uint32_t clipboardId=0;
+    std::vector<uint8_t> clipboardOutgoing;
     long frames=0, metricsFrames=0;
     uint64_t metricsAt=0, handleCpuNs=0, handleWallNs=0, renderWallNs=0, socketWaitNs=0;
     int authenticationResult=-1;
@@ -54,3 +58,11 @@ bool finishAppleDisplay(NativeSession* session);
 
 /** Sends a complete keyboard batch without interleaving pointer or modifier transitions. */
 bool sendKeyboard(NativeSession* session,const std::vector<int32_t>& keys);
+
+/** Requests a complete pixel baseline after encryption/resize, with one delayed startup retry. */
+bool refreshDesktop(NativeSession* session,bool retry);
+
+/** Apple clipboard helpers; payloads never pass through diagnostic logging. */
+bool requestAppleClipboard(NativeSession* session);
+bool sendAppleClipboard(NativeSession* session,int action,const std::vector<uint8_t>& payload);
+int receiveAppleClipboard(NativeSession* session);

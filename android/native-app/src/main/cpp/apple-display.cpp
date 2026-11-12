@@ -1,5 +1,6 @@
 /* Bounded Apple display metadata; geometry changes are applied before requesting a real-sized picture. */
 #include "native-session.h"
+#include <chrono>
 namespace {
 unsigned u16(const uint8_t* p){return unsigned(p[0])<<8|p[1];}
 bool geometry(NativeSession* s,unsigned width,unsigned height){
@@ -16,7 +17,7 @@ bool appleDisplayInfo(NativeSession* s,const std::vector<uint8_t>& data,unsigned
     if(data.size()<20)return false;
     unsigned count=u16(data.data()+18);if(count>(data.size()-20)/56)return false;
     if(!width||!height){width=u16(data.data()+6);height=u16(data.data()+8);}
-    return geometry(s,width,height);
+    s->geometryChanged=true;return geometry(s,width,height);
 }
 extern "C" int ivncAppleMetadata(rfbClient* c,unsigned encoding,int x,int y,int width,int height){
     auto* s=static_cast<NativeSession*>(rfbClientGetClientData(c,nullptr));if(!s->appleProtocol)return 0;
@@ -34,5 +35,13 @@ extern "C" int ivncAppleMetadata(rfbClient* c,unsigned encoding,int x,int y,int 
 }
 bool finishAppleDisplay(NativeSession* s){
     if(!s->geometryChanged)return true;s->geometryChanged=false;
-    return SendFramebufferUpdateRequest(s->client,0,0,s->client->width,s->client->height,FALSE)&&appleAutoUpdate(s);
+    return refreshDesktop(s,true);
+}
+
+bool refreshDesktop(NativeSession* s,bool retry){
+    if(s->awaitingGeometry)return true;
+    if(!SendFramebufferUpdateRequest(s->client,0,0,s->client->width,s->client->height,FALSE))return false;
+    if(s->appleProtocol&&!appleAutoUpdate(s))return false;
+    if(retry)s->refreshRetryAtMs=std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()+50;
+    return true;
 }

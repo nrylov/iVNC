@@ -73,6 +73,7 @@ extern "C" int ivncAppleInitialRequest(rfbClient* c){return !owner(c)->awaitingG
 extern "C" int ivncAppleMessage(rfbClient* c,unsigned type){
     auto* s=owner(c);if(!s->appleProtocol)return 0;
     if(type==4||type==7)return 1;
+    if(type==31)return receiveAppleClipboard(s);
     if(type==81){std::vector<uint8_t> data;if(!readBlock(c,data))return -1;
         if(!appleDisplayInfo(s,data,0,0)||!finishAppleDisplay(s))return -1;return 1;}
     if(type!=20)return 0;
@@ -80,6 +81,8 @@ extern "C" int ivncAppleMessage(rfbClient* c,unsigned type){
     std::vector<uint8_t> data;if(!readBlock(c,data)||data.size()<4)return -1;
     unsigned status=u16(data.data()+2);
     if(status==1){s->emit("error","Mac closed the screen sharing session");return -1;}
+    if(status==2&&!requestAppleClipboard(s))return -1;
+    if(status==3&&!s->clipboardOutgoing.empty()&&!sendAppleClipboard(s,3,s->clipboardOutgoing))return -1;
     if(status==4&&!appleAutoUpdate(s))return -1;
     return 1;
 }

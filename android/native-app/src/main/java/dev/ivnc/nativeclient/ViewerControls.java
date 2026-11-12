@@ -49,7 +49,7 @@ final class ViewerControls {
             PopupMenu menu=new PopupMenu(activity,button);
             menu.getMenu().add(status.get()).setEnabled(false);
             String[][] items={{"Connection…","connection"},{"Zoom in","zoom-in"},{"Zoom out","zoom-out"},
-                {"Fit desktop","fit"},{"Scroll sensitivity…","scroll"},{"Gesture help","help"},{"Disconnect","disconnect"}};
+                {"Fit desktop","fit"},{"Scroll sensitivity…","scroll"},{"Refresh desktop","refresh"},{"Get Mac clipboard","clipboard-get"},{"Send phone clipboard","clipboard-send"},{"Gesture help","help"},{"Disconnect","disconnect"}};
             for(int i=0;i<items.length;i++)menu.getMenu().add(0,i,i+1,items[i][0]);
             menu.getMenu().add(0,300,4,"Drag lock").setCheckable(true).setChecked(dragging.get());
             android.view.SubMenu advanced=menu.getMenu().addSubMenu(0,200,20,"Diagnostics");

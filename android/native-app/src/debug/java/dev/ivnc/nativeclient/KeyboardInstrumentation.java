@@ -23,7 +23,7 @@ public final class KeyboardInstrumentation extends Instrumentation {
     @Override public void onStart(){
         NativeActivity activity=null;Bundle result=new Bundle();KeyboardDock[] dock=new KeyboardDock[1];
         try{
-            activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));NativeActivity target=activity;
+            activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).putExtra("ivnc.synthetic",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));NativeActivity target=activity;
             AtomicReference<Throwable> failure=new AtomicReference<>();List<int[]> batches=new ArrayList<>();int[] reserved={0};
             runOnMainSync(()->{try{
                 ((AlertDialog)field(target,"connectionPanel")).dismiss();

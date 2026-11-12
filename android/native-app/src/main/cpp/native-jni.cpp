@@ -66,3 +66,17 @@ extern "C" JNIEXPORT jboolean JNICALL Java_dev_ivnc_nativeclient_NativeRfb_keys(
     if(!session->running||session->input.size()>=254)return JNI_FALSE;
     NativeSession::Pointer command{};command.keys=std::move(keys);session->input.push_back(std::move(command));return JNI_TRUE;
 }
+
+extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_refresh(JNIEnv*,jclass,jlong handle){
+    if(handle)reinterpret_cast<NativeSession*>(handle)->refreshRequested=true;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_dev_ivnc_nativeclient_NativeRfb_clipboard(JNIEnv* env,jclass,jlong handle,jint action,jbyteArray payload){
+    if(!handle||action<1||action>3)return JNI_FALSE;
+    NativeSession::Pointer command{};command.clipboardAction=action;
+    if(action==3){if(!payload)return JNI_FALSE;int size=env->GetArrayLength(payload);if(size<4||size>1024*1024)return JNI_FALSE;
+        command.clipboard.resize(size);env->GetByteArrayRegion(payload,0,size,reinterpret_cast<jbyte*>(command.clipboard.data()));}
+    auto* s=reinterpret_cast<NativeSession*>(handle);std::lock_guard<std::mutex> guard(s->inputMutex);
+    for(auto& queued:s->input)if(queued.clipboardAction==action){queued.clipboard=std::move(command.clipboard);return JNI_TRUE;}
+    if(!s->running||s->input.size()>=254)return JNI_FALSE;s->input.push_back(std::move(command));return JNI_TRUE;
+}

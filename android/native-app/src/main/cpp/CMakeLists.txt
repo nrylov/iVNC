@@ -15,7 +15,7 @@ add_subdirectory("${IVNC_ROOT}/.dev/libvncclient-source" libvnc)
 # cppFlags applies only to our C++ files. Keep symbols/UI debugging, optimize
 # the actual native engine so performance measurements are meaningful.
 target_compile_options(vncclient PRIVATE -O3)
-add_library(ivncrfb SHARED native-session.cpp native-jni.cpp apple-auth.cpp apple-transport.cpp apple-session.cpp apple-display.cpp apple-keyboard.cpp)
+add_library(ivncrfb SHARED native-session.cpp native-jni.cpp apple-auth.cpp apple-transport.cpp apple-session.cpp apple-display.cpp apple-keyboard.cpp apple-clipboard.cpp)
 target_include_directories(ivncrfb PRIVATE "${IVNC_ROOT}/.dev/libvncclient-source/include" "${CMAKE_CURRENT_BINARY_DIR}/libvnc/include")
 target_link_libraries(ivncrfb vncclient android log)
 target_link_options(ivncrfb PRIVATE "-Wl,-z,max-page-size=16384")

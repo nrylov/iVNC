@@ -17,7 +17,7 @@ public final class PasswordMaskInstrumentation extends Instrumentation {
         Bundle result=new Bundle();
         NativeActivity activity=null;
         try {
-            activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).putExtra("ivnc.synthetic",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             final NativeActivity target=activity;
             AtomicReference<Throwable> failure=new AtomicReference<>();
             runOnMainSync(()->{

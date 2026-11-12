@@ -26,7 +26,7 @@ public final class ViewerUxInstrumentation extends Instrumentation {
     @Override public void onStart(){
         NativeActivity activity=null;Bundle result=new Bundle();
         try{
-            activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).putExtra("ivnc.synthetic",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             NativeActivity target=activity;AtomicReference<Throwable> failure=new AtomicReference<>();
             waitForIdleSync();
             runOnMainSync(()->{try{

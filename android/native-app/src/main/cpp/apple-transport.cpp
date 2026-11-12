@@ -70,5 +70,5 @@ bool finishAppleEncryption(NativeSession* s){
     const uint8_t ack[]={18,0,0,2,0,1,0,0};
     if(!ivncWritePlain(s->client,reinterpret_cast<const char*>(ack),sizeof(ack)))return false;
     s->encryptionPending=false;s->encryptionActive=true;s->emit("status","Apple encrypted control transport active");
-    return s->pushUpdates?true:SendIncrementalFramebufferUpdateRequest(s->client);
+    return refreshDesktop(s,true);
 }

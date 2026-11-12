@@ -20,9 +20,12 @@ import java.util.concurrent.Executors;
 
 /** Experimental Standard-mode path; kept separate from the working HP client. */
 public final class NativeActivity extends Activity implements TextureView.SurfaceTextureListener {
-    private final ExecutorService worker=Executors.newSingleThreadExecutor();
-    private final Object lifetime=new Object();
-    private long handle;
+    private NativeConnection connection;
+    private SavedConnection saved;
+    private ClipboardSync clipboard;
+    private boolean resumed,profileSaved,haveFramebuffer,screenReady;
+    private android.widget.CheckBox remember;
+    private boolean synthetic;
     private TextureView texture;
     private ViewportRenderer renderer;
     private KeyboardDock keyboardDock;
@@ -45,6 +48,13 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private android.widget.CheckBox compatibility;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
+        synthetic=(getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0&&getIntent().getBooleanExtra("ivnc.synthetic",false);
+        saved=new SavedConnection(this,synthetic);
+        connection=new NativeConnection(new NativeRfb.Events(){
+            public void event(String kind,String value){NativeActivity.this.event(kind,value);}
+            public void clipboard(byte[] bytes){clipboard.receive(bytes);}
+        });
+        clipboard=new ClipboardSync(synthetic?ClipboardSync.memory():ClipboardSync.android(this),connection::clipboard,message->android.widget.Toast.makeText(this,message,android.widget.Toast.LENGTH_SHORT).show());
         getWindow().setDecorFitsSystemWindows(false);
         String version="unknown";
         try{version=getPackageManager().getPackageInfo(getPackageName(),0).versionName;}catch(android.content.pm.PackageManager.NameNotFoundException ignored){}
@@ -59,7 +69,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         status=new TextView(this);status.setTag("native-status");status.setText("Disconnected");status.setVisibility(View.GONE);status.setPadding(20,40,20,12);status.setBackgroundColor(0xcc101b2a);root.addView(status,new FrameLayout.LayoutParams(-1,-2));
         pipeline=new android.widget.ToggleButton(this);pipeline.setChecked(true);
         pipeline.setOnCheckedChangeListener((button,enabled)->{
-            synchronized(lifetime){if(handle!=0)NativeRfb.pipeline(handle,enabled);}
+            connection.input(handle->NativeRfb.pipeline(handle,enabled));
             debugLog.add("status","Update request pipeline "+(enabled?"enabled":"disabled")+" for subsequent updates");
         });
         ViewerControls.attach(this,root,()->(connected?"Connected":"Disconnected")+" · "+Math.round(viewport.zoom()*100)+"%",pipeline::isChecked,()->trackpad!=null&&trackpad.dragLocked(),()->keyboardReserved,this::viewerAction);
@@ -74,11 +84,11 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             }
             public void hold(boolean down){cursor.dragging(down);pointer(down?1:0);}
             public void click(int button){pointer(button);pointer(0);}
-            public void wheel(int mask){synchronized(lifetime){if(handle!=0)NativeRfb.wheel(handle,(int)cursorX,(int)cursorY,mask);}}
+            public void wheel(int mask){connection.input(handle->NativeRfb.wheel(handle,(int)cursorX,(int)cursorY,mask));}
         });
         trackpad.setScrollSpeed(ScrollSettings.savedSpeed(this));
         keyboardDock=new KeyboardDock(this,root,new NativeKeyboard(events->{
-            synchronized(lifetime){return connected&&handle!=0&&NativeRfb.keys(handle,events);}
+            return connected&&connection.keys(events);
         }),bottom->{
             keyboardReserved=Math.min(bottom,Math.max(0,root.getHeight()-(int)(72*getResources().getDisplayMetrics().density)));ViewerControls.reserved(root,keyboardReserved);
             int margin=Math.min(bottom,Math.max(0,root.getHeight()-64));
@@ -93,7 +103,12 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         password.setSaveEnabled(false);
         password.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         compatibility=new android.widget.CheckBox(this);compatibility.setText("Compatibility mode");
-        connectionDialog();
+        remember=new android.widget.CheckBox(this);remember.setText("Remember connection securely");remember.setChecked(true);
+        ConnectionProfile stored=saved.profile();
+        if(stored!=null){host.setText(stored.host);port.setText(String.valueOf(stored.port));user.setText(stored.username);compatibility.setChecked(!stored.enhanced);pipeline.setChecked(stored.pipeline);password.setHint("Saved password");}
+        if(!synthetic&&stored!=null&&saved.autoResume()){profileSaved=true;connection.connect(stored);}
+        else connectionDialog();
+        if(saved.error()!=null){status.setText(saved.error());status.setVisibility(View.VISIBLE);}
     }
     private void showDebugLog(){
         TextView text=new TextView(this);text.setTag("native-debug-text");text.setText(debugLog.snapshot());text.setTextIsSelectable(true);
@@ -117,6 +132,12 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         }
         if(compatibility.getParent()!=null)((android.view.ViewGroup)compatibility.getParent()).removeView(compatibility);
         fields.addView(compatibility);
+        if(remember.getParent()!=null)((android.view.ViewGroup)remember.getParent()).removeView(remember);fields.addView(remember);
+        TextView note=new TextView(this);note.setText(saved.profile()==null?"Login is encrypted on this device when remembered.":"Saved connection · password stored securely");fields.addView(note);
+        if(saved.profile()!=null){Button forget=new Button(this);forget.setText("Forget saved connection");forget.setOnClickListener(view->{
+            stop();saved.forget(ok->note.setText(ok?"Saved connection forgotten":"Could not fully remove saved connection"));
+            password.setText("");password.setHint("Mac password");remember.setChecked(false);forget.setEnabled(false);
+        });fields.addView(forget);}
         android.widget.ScrollView content=new android.widget.ScrollView(this);content.addView(fields);
         connectionPanel=new AlertDialog.Builder(this).setTitle("Connect to your Mac").setView(content)
             .setMessage("Standard mode · macOS Screen Sharing").setCancelable(true)
@@ -125,21 +146,15 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     }
     private void connect(){
         status.setVisibility(View.VISIBLE);
-        if(surface==null){status.setText("Display is not ready; try Connect again");return;}
         final int selectedPort;
         try{selectedPort=Integer.parseInt(port.getText().toString());if(selectedPort<1||selectedPort>65535)throw new NumberFormatException();}
         catch(NumberFormatException invalid){status.setText("Invalid port");return;}
-        final String address=host.getText().toString().trim(),username=user.getText().toString(),secret=password.getText().toString();
+        String address=host.getText().toString().trim(),username=user.getText().toString(),secret=password.getText().toString();
+        ConnectionProfile stored=saved.profile();if(secret.isEmpty()&&stored!=null&&stored.matches(address,selectedPort,username))secret=stored.password;
         if(address.isEmpty()||username.isEmpty()||secret.isEmpty()){status.setText("Enter the Mac address and login");return;}
-        password.setText("");stop();
-        final Surface target=surface;
-        final boolean earlyRequests=pipeline.isChecked(),enhanced=!compatibility.isChecked();
-        worker.execute(()->{
-            final long session;
-            synchronized(lifetime){session=NativeRfb.create((kind,value)->runOnUiThread(()->event(kind,value)));handle=session;NativeRfb.pipeline(session,earlyRequests);NativeRfb.enhanced(session,enhanced);}
-            try{NativeRfb.run(session,address,selectedPort,username,secret,target);}
-            finally{synchronized(lifetime){if(handle==session)handle=0;NativeRfb.destroy(session);}}
-        });
+        password.setText("");trackpad.cancel();clipboard.ready(false);connected=screenReady=false;haveFramebuffer=false;profileSaved=false;
+        if(!remember.isChecked())saved.forget(ok->{});
+        connection.connect(new ConnectionProfile(address,selectedPort,username,secret,!compatibility.isChecked(),pipeline.isChecked(),remember.isChecked()));
     }
     private void event(String kind,String value){
         if(kind.equals("cursor")){
@@ -149,18 +164,26 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             }
             return;
         }
+        if(kind.equals("status")&&value.equals("Apple encrypted control transport active"))clipboard.ready(true);
+        if(kind.equals("error")&&value.contains("authentication"))saved.autoResume(false);
         debugLog.add(kind,kind.equals("metrics")?value+" "+renderer.counters():value);
         if(kind.equals("status")&&value.startsWith("Native standard VNC connected"))connected=true;
-        if(kind.equals("error")||(kind.equals("status")&&value.equals("Native connection ended"))){connected=false;trackpad.cancel();cursor.setVisibility(View.INVISIBLE);}
+        if(kind.equals("error")||(kind.equals("status")&&value.equals("Native connection ended"))){connected=screenReady=false;clipboard.ready(false);trackpad.cancel();cursor.setVisibility(View.INVISIBLE);}
         if(kind.equals("metrics")||kind.equals("protocol"))return;
         if(kind.equals("error")){if(errorShown)return;errorShown=true;}
         else if(kind.equals("status")&&value.startsWith("Connecting"))errorShown=false;
         else if(kind.equals("status")&&errorShown)return;
-        status.setVisibility(connected&&!errorShown?View.GONE:View.VISIBLE);
+        status.setVisibility(connected&&screenReady&&!errorShown?View.GONE:View.VISIBLE);
         if(kind.equals("size")){
-            String[] size=value.split(",");width=Integer.parseInt(size[0]);height=Integer.parseInt(size[1]);
-            cursorX=width/2f;cursorY=height/2f;viewport.reset();fit();
-        }else if(kind.equals("frames")){if(connected)cursor.setVisibility(View.VISIBLE);status.setText("Native Standard · "+value+" Surface posts");}
+            String[] size=value.split(",");int nextWidth=Integer.parseInt(size[0]),nextHeight=Integer.parseInt(size[1]);
+            if(!haveFramebuffer||width!=nextWidth||height!=nextHeight){cursorX=nextWidth/2f;cursorY=nextHeight/2f;viewport.reset();}
+            width=nextWidth;height=nextHeight;haveFramebuffer=true;fit();
+        }else if(kind.equals("frames")){
+            screenReady=true;if(connected){cursor.setVisibility(View.VISIBLE);status.setVisibility(View.GONE);}
+            if(!profileSaved&&connection.profile()!=null){profileSaved=true;ConnectionProfile profile=connection.profile();
+                if(profile.remember){saved.autoResume(true);saved.save(profile,ok->{if(!ok)android.widget.Toast.makeText(this,"Connection works, but saving failed",android.widget.Toast.LENGTH_LONG).show();else password.setHint("Saved password");});}}
+            status.setText("Native Standard · "+value+" Surface posts");
+        }
         else status.setText(value);
     }
     private void viewerAction(String action){
@@ -169,6 +192,9 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             case "drag-lock":
                 if(connected)trackpad.setDragLocked(!trackpad.dragLocked());else android.widget.Toast.makeText(this,"Connect to your Mac first",android.widget.Toast.LENGTH_SHORT).show();break;
             case "connection":trackpad.cancel();keyboardDock.hide();connectionDialog();break;
+            case "refresh":connection.input(NativeRfb::refresh);break;
+            case "clipboard-get":clipboard.request();break;
+            case "clipboard-send":clipboard.phone(true);break;
             case "log":showDebugLog();break;
             case "pipeline":pipeline.setChecked(!pipeline.isChecked());break;
             case "scroll":ScrollSettings.show(this,speed->trackpad.setScrollSpeed(speed));break;
@@ -197,13 +223,18 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         }else if(action==MotionEvent.ACTION_CANCEL){trackpad.cancel();touchActive=false;}
         return true;
     }
-    private void pointer(int buttons){lastLocalPointerAt=android.os.SystemClock.uptimeMillis();viewport.follow(cursorX,cursorY);applyViewport();synchronized(lifetime){if(handle!=0)NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons);}}
-    private void stop(){if(keyboardDock!=null)keyboardDock.clear();connected=false;touchActive=false;if(trackpad!=null)trackpad.cancel();if(cursor!=null)cursor.setVisibility(View.INVISIBLE);synchronized(lifetime){if(handle!=0)NativeRfb.stop(handle);}}
-    @Override public void onSurfaceTextureAvailable(SurfaceTexture value,int width,int height){surface=new Surface(value);fit();}
-    @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture value){stop();if(surface!=null)surface.release();surface=null;return true;}
+    private void pointer(int buttons){lastLocalPointerAt=android.os.SystemClock.uptimeMillis();viewport.follow(cursorX,cursorY);applyViewport();connection.input(handle->NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons));}
+    private void offline(){
+        if(keyboardDock!=null)keyboardDock.clear();connected=screenReady=false;touchActive=false;clipboard.ready(false);
+        if(trackpad!=null)trackpad.cancel();if(cursor!=null)cursor.setVisibility(View.INVISIBLE);
+    }
+    private void stop(){offline();connection.disconnect();saved.autoResume(false);}
+    @Override public void onSurfaceTextureAvailable(SurfaceTexture value,int width,int height){surface=new Surface(value);fit();connection.surface(surface);}
+    @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture value){offline();connection.surface(null);surface=null;return true;}
     @Override public void onSurfaceTextureSizeChanged(SurfaceTexture value,int width,int height){fit();}
     @Override public void onSurfaceTextureUpdated(SurfaceTexture value){}
-    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)ViewerControls.immersive(this);}
-    @Override protected void onPause(){stop();super.onPause();}
-    @Override protected void onDestroy(){stop();worker.shutdown();super.onDestroy();}
+    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)ViewerControls.immersive(this);if(clipboard!=null)clipboard.focus(focused&&resumed);}
+    @Override protected void onResume(){super.onResume();resumed=true;clipboard.focus(hasWindowFocus());connection.foreground(true);}
+    @Override protected void onPause(){resumed=false;clipboard.focus(false);offline();connection.foreground(false);super.onPause();}
+    @Override protected void onDestroy(){connection.close();saved.close();super.onDestroy();}
 }
