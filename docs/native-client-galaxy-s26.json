@@ -37,7 +37,7 @@
   "highPerformance": "Not yet ported",
   "appleClipboard": "Implemented encrypted Apple text clipboard; synthetic native Galaxy tests pass; actual Mac verification pending",
   "release": "On hold by owner until native is evaluated",
-  "appVersion": "0.15-native-sessions-clipboard",
+  "appVersion": "0.16-native-clipboard-stream",
   "realMacPublicKeyProbe": {
     "passed": true,
     "credentialsSent": false,
@@ -144,5 +144,11 @@
     "hostClipboardPolicy": "PASS: bounds, echo suppression, no background reads, returning phone-copy priority",
     "ownerVerification": "Pending actual Mac 0.15 test",
     "privacy": "Synthetic credentials, separate test preferences/keys, memory clipboard; owner data untouched"
+  },
+  "clipboardStreamRegression": {
+    "previousBuild": "FAIL reproduced with SYNC_FLUSH clipboard after initial frame",
+    "fixedBuild": "PASS flushed/finalized clipboard, oversized raw/wire payloads and malformed zlib skipped; continued exchange",
+    "savedSessionRegression": "PASS",
+    "realMac": "Awaiting owner confirmation; no owner clipboard inspected"
   }
 }

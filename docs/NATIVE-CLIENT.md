@@ -50,7 +50,7 @@ particular frame rate.
 
 ## Current status (2026-11-12)
 
-Native 0.15 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
+Native 0.16 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
 Mac login, live 1920×1080 Standard updates, relative pointer input and two-finger
 scrolling. Synthetic/device regressions cover Apple RSA/AES auth, fragmented
 reads, exact native pixels, cursor, pipeline request ordering and wheel packets.
@@ -82,3 +82,8 @@ startup images. Synthetic Galaxy tests cover these paths and regressions; actual
 Mac verification is pending. See [saved connection behavior](SAVED-CONNECTIONS.md).
 Release stays on hold until owner selects a base. Native architecture
 removes the bridge but does not by itself guarantee improved performance.
+
+0.16 fixes a post-first-frame disconnect on flushed zlib clipboard packets.
+Galaxy regression reproduces the failure on prior source and passes after the
+fix. Invalid/oversized clipboard data is skipped within bounded framing limits;
+actual Mac confirmation is pending.

@@ -1,3 +1,32 @@
+# Native 0.16 clipboard stream disconnect fix — 2026-11-12
+
+Owner reports 0.15 accepts login, activates encrypted tunnel, presents one frame,
+then fails message handling immediately. Reproduced the same failure with a
+synthetic Apple clipboard using zlib SYNC_FLUSH (no final trailer). The previous
+uncompress() required Z_STREAM_END; original hybrid inflater accepts flush streams.
+No owner clipboard was inspected. This identifies a matching failure path, not
+proof of the exact contents/type of the owner's triggering clipboard packet.
+
+Fix: use bounded inflate accepting flushed or finalized data only when exact
+advertised output length and all compressed input consumed; spare output byte
+rejects overflow. Clipboard format/size/decode errors no longer terminate the
+session: consume framed payload with bounded chunked discard and skip it. A
+16MiB wire cap still fails closed with a specific safe error; text limit is 1MiB.
+No clipboard data/addresses/credentials logged or inspected.
+
+Validation: previous source fails the new flush-stream Galaxy synthetic regression
+with the same message-handling error. 0.16 build PASS; SessionFeaturesInstrumentation
+PASS for flushed and finished zlib, malformed data, oversized raw/compressed lengths,
+continued clipboard exchange, complete-image refresh and both clipboard directions.
+SavedSessionInstrumentation PASS again (encrypted login, return/recreation, zoom,
+manual Disconnect, Forget and rejected-login behavior). All use synthetic peers,
+separate keys/preferences and memory clipboard. Logs in ignored .dev/native-clipboard-*.
+
+0.16-native-clipboard-stream installed on Galaxy. Next: owner reconnects to actual
+Mac and checks sustained session + clipboard. Do not claim actual Mac fix confirmed
+until response. Native High Performance still next; release remains on hold.
+Repository/main: /Users/nikolairylov/Repositories/iVNC; do not edit newserver.
+
 # Native 0.15 saved sessions, clipboard and initial refresh — 2026-11-12
 
 Current checkpoint: milestone implemented, built and installed on Galaxy as

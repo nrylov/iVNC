@@ -18,16 +18,17 @@ public final class SessionFeaturesInstrumentation extends Instrumentation {
     @Override public void onCreate(Bundle args){super.onCreate(args);start();}
     @Override public void onStart(){
         Bundle result=new Bundle();long handle=0;Thread client=null;HandlerThread reader=new HandlerThread("synthetic-images");reader.start();
-        CountDownLatch complete=new CountDownLatch(1),clipboard=new CountDownLatch(1);AtomicReference<Throwable> failure=new AtomicReference<>();
+        CountDownLatch complete=new CountDownLatch(1),clipboard=new CountDownLatch(2);AtomicReference<Throwable> failure=new AtomicReference<>();
         try(SyntheticRfbServer server=new SyntheticRfbServer(true);ImageReader images=ImageReader.newInstance(32,32,PixelFormat.RGBA_8888,3)){
-            server.enhanced=server.encrypted=server.partialUntilRefresh=true;server.frameLimit=3;
+            server.enhanced=server.encrypted=server.partialUntilRefresh=true;server.frameLimit=3;server.clipboardPeer.exerciseRejected=true;
+            java.util.concurrent.atomic.AtomicInteger skipped=new java.util.concurrent.atomic.AtomicInteger();
             images.setOnImageAvailableListener(source->{try(Image image=source.acquireLatestImage()){
                 if(image==null)return;Image.Plane plane=image.getPlanes()[0];java.nio.ByteBuffer pixels=plane.getBuffer();boolean full=true;
                 for(int y=0;y<32;y++)for(int x=0;x<32;x++){int offset=y*plane.getRowStride()+x*plane.getPixelStride();full&=(pixels.get(offset)&255)==241&&(pixels.get(offset+1)&255)==64&&(pixels.get(offset+2)&255)==32;}
                 if(full)complete.countDown();
             }catch(Throwable error){failure.set(error);}},new Handler(reader.getLooper()));
             handle=NativeRfb.create(new NativeRfb.Events(){
-                public void event(String kind,String value){if(kind.equals("error"))failure.compareAndSet(null,new IllegalStateException(value));}
+                public void event(String kind,String value){if(value.startsWith("Mac clipboard skipped:"))skipped.incrementAndGet();if(kind.equals("error"))failure.compareAndSet(null,new IllegalStateException(value));}
                 public void clipboard(byte[] bytes){try{if(SyntheticClipboardPeer.MAC.equals(ApplePasteboard.decode(bytes)))clipboard.countDown();else failure.set(new IllegalStateException("Incoming clipboard changed"));}catch(Exception error){failure.set(error);}}
             });
             NativeRfb.enhanced(handle,true);final long session=handle;
@@ -41,9 +42,10 @@ public final class SessionFeaturesInstrumentation extends Instrumentation {
             require(clipboard.await(5,TimeUnit.SECONDS),"Mac clipboard missing: "+failure.get()+" / "+server.failure);
             require(server.clipboardPeer.requestedTwice.await(5,TimeUnit.SECONDS),"Clipboard-change notification not requested");
             require(server.clipboardPeer.sentTwice.await(5,TimeUnit.SECONDS),"Data-needed notification did not resend clipboard");
+            require(skipped.get()==3,"Unsupported clipboard envelopes were not safely skipped");
             require(failure.get()==null,"Native session failed: "+failure.get());
             NativeRfb.stop(handle);client.join(7000);require(!client.isAlive(),"Session did not stop");
-            result.putString("stream","PASS: initial partial image becomes complete without pointer input; delayed encrypted full refresh; native UTF-8 clipboard both directions/session IDs/change/data-needed. No system clipboard accessed.");finish(Activity.RESULT_OK,result);
+            result.putString("stream","PASS: initial partial image becomes complete without pointer input; delayed encrypted full refresh; native UTF-8 clipboard both directions/session IDs/change/data-needed, flushed and finished zlib, oversized/malformed clipboard skipped without disconnect. No system clipboard accessed.");finish(Activity.RESULT_OK,result);
         }catch(Throwable error){result.putString("stream","SESSION FEATURES FAILED: "+error);finish(Activity.RESULT_CANCELED,result);}
         finally{if(handle!=0){NativeRfb.stop(handle);try{if(client!=null)client.join(7000);}catch(InterruptedException ignored){}if(client==null||!client.isAlive())NativeRfb.destroy(handle);}reader.quitSafely();}
     }
