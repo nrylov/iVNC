@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parent.parent
 SOURCE=ROOT/'third_party/libvncserver'
 OUTPUT=ROOT/'.dev/libvncclient-source'
 REVISION='98aaee0560baa0332339b2ef464ea96ed9b9b28c'
-PATCH='socket-idle-rsa33-pipeline-v4'
+PATCH='socket-idle-rsa33-control-v5'
 identity=REVISION+' '+PATCH
 if subprocess.check_output(['git','-C',str(SOURCE),'rev-parse','HEAD'],text=True).strip()!=REVISION:
     raise SystemExit('LibVNCClient revision differs from the reviewed pin')
@@ -48,6 +48,11 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     assert source.count(small)==1 and source.count(large)==1
     source=source.replace(small,'      if (i > 0) retries = 0;\n'+small)
     source=source.replace(large,'      if (i > 0) retries = 0;\n'+large)
+    source=source.replace('\nReadFromRFBServer(rfbClient*','\nivncReadPlain(rfbClient*',1)
+    source=source.replace('\nWriteToRFBServer(rfbClient*','\nivncWritePlain(rfbClient*',1)
+    source+='\nextern rfbBool ivncReadStream(rfbClient*,char*,unsigned int);\nextern rfbBool ivncWriteStream(rfbClient*,const char*,unsigned int);\nrfbBool ReadFromRFBServer(rfbClient* client,char* out,unsigned int n){return ivncReadStream(client,out,n);}\nrfbBool WriteToRFBServer(rfbClient* client,const char* bytes,unsigned int n){return ivncWriteStream(client,bytes,n);}\n'
+    source=source.replace('  if (client->buffered > 0) return 1;','  if (client->buffered > 0 || ivncClearBuffered(client)) return 1;')
+    source=source.replace('int WaitForMessage(rfbClient* client,unsigned int usecs)\n{','extern int ivncClearBuffered(rfbClient*);\nint WaitForMessage(rfbClient* client,unsigned int usecs)\n{')
     path.write_text(source)
     path=OUTPUT/'src/libvncclient/rfbclient.c'
     source=path.read_text()
@@ -72,8 +77,11 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     source=source.replace(received,received+'\n    requestWasPipelined = ivncPipelineUpdates(client);\n    if (requestWasPipelined && !SendIncrementalFramebufferUpdateRequest(client)) return FALSE;')
     tail='    if (!SendIncrementalFramebufferUpdateRequest(client))\n      return FALSE;'
     assert source.count(tail)==1
-    source=source.replace(tail,'    if (!requestWasPipelined && !SendIncrementalFramebufferUpdateRequest(client))\n      return FALSE;')
-    source=source.replace('extern void ivncAuthenticationResult(rfbClient*, uint32_t);','extern int ivncPipelineUpdates(rfbClient*);\nextern void ivncAuthenticationResult(rfbClient*, uint32_t);')
+    source=source.replace(tail,'    if (!requestWasPipelined && ivncContinueUpdates(client) && !SendIncrementalFramebufferUpdateRequest(client))\n      return FALSE;')
+    source=source.replace('extern void ivncAuthenticationResult(rfbClient*, uint32_t);','extern int ivncContinueUpdates(rfbClient*);\nextern int ivncAppleRectangle(rfbClient*, unsigned);\nextern int ivncPipelineUpdates(rfbClient*);\nextern void ivncAuthenticationResult(rfbClient*, uint32_t);')
+    rectangle='      if (rect.encoding == rfbEncodingXCursor ||'
+    assert source.count(rectangle)==1
+    source=source.replace(rectangle,'      {int apple = ivncAppleRectangle(client, rect.encoding); if(apple < 0) return FALSE; if(apple > 0) continue;}\n\n'+rectangle)
     path.write_text(source)
     marker.write_text(identity)
 print('LibVNCClient '+identity+' prepared in project-local .dev')

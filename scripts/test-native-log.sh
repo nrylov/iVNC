@@ -15,3 +15,7 @@ javac -d "$OUT" "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativec
   "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativeclient/DesktopViewport.java" \
   "$PROJECT_ROOT/android/native-app/tests/DesktopViewportTest.java"
 java -cp "$OUT" dev.ivnc.nativeclient.DesktopViewportTest
+
+javac -d "$OUT" "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativeclient/AppleTunnel.java" \
+  "$PROJECT_ROOT/android/native-app/tests/AppleTunnelTest.java"
+java -cp "$OUT" dev.ivnc.nativeclient.AppleTunnelTest

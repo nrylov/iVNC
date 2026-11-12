@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdarg>
 #include <ctime>
+#include <algorithm>
 
 namespace {
 uint64_t clockNs(clockid_t clock){timespec value{};clock_gettime(clock,&value);return uint64_t(value.tv_sec)*1000000000ULL+value.tv_nsec;}
@@ -33,12 +34,12 @@ rfbBool allocate(rfbClient* client){
     return client->frameBuffer?TRUE:FALSE;
 }
 void updated(rfbClient* client,int,int,int width,int height){if(width>0&&height>0)owner(client)->frameDirty=true;}
-void finished(rfbClient* client){auto* session=owner(client);if(session->frameDirty){session->present();session->frameDirty=false;}}
+void finished(rfbClient* client){auto* session=owner(client);if(!finishAppleEncryption(session)){session->emit("error","Apple encryption transition failed");session->running=false;return;}if(session->frameDirty){session->present();session->frameDirty=false;}}
 rfbBool cursorPosition(rfbClient* client,int x,int y){
     char position[64];snprintf(position,sizeof(position),"%d,%d",x,y);owner(client)->emit("cursor",position);return TRUE;
 }
 }
-extern "C" int ivncPipelineUpdates(rfbClient* client){return owner(client)->pipelineUpdates?1:0;}
+extern "C" int ivncPipelineUpdates(rfbClient* client){auto* s=owner(client);return s->pipelineUpdates&&(!s->encryptionRequested||s->encryptionActive)?1:0;}
 extern "C" void ivncAuthenticationResult(rfbClient* client, uint32_t result) {
     auto* session=owner(client);
     session->authenticationResult=static_cast<int>(result);
@@ -83,12 +84,16 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
         else {
             emit("status","Native standard VNC connected; Apple extensions pending");
             emit("status",pipelineUpdates?"Update requests pipelined before framebuffer decoding":"Update requests sent after framebuffer decoding");
+            if(encryptionRequested){
+                const uint8_t request[]={18,0,0,1,0,1,0,1,0,0,0,1};
+                if(!WriteToRFBServer(client,reinterpret_cast<const char*>(request),sizeof(request)))running=false;
+            }
             metricsAt=clockNs(CLOCK_MONOTONIC);
             while(running){
                 {std::deque<Pointer> commands;{std::lock_guard<std::mutex> guard(inputMutex);commands.swap(input);}
                     for(const auto& p:commands)if(!SendPointerEvent(client,p.x,p.y,p.buttons)){running=false;break;}}
                 uint64_t waiting=clockNs(CLOCK_MONOTONIC);
-                int ready=client->buffered?1:WaitForMessage(client,10000);
+                int ready=WaitForMessage(client,10000);
                 socketWaitNs+=clockNs(CLOCK_MONOTONIC)-waiting;
                 if(ready<0){if(running)emit("error","Native socket wait failed; see Debug log");break;}
                 if(ready>0){
@@ -102,6 +107,8 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
             }
         }
     }
+    env->CallVoidMethod(tunnel,env->GetMethodID(tunnelClass,"close","()V"));
+    std::fill(decrypted.begin(),decrypted.end(),0);decrypted.clear();decryptedOffset=0;
     socket=-1;
     if(window){ANativeWindow_release(window);window=nullptr;}
     free(client->frameBuffer);client->frameBuffer=nullptr;rfbClientCleanup(client);client=nullptr;

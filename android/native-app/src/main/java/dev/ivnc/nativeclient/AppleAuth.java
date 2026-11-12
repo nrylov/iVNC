@@ -16,12 +16,14 @@ import javax.crypto.spec.SecretKeySpec;
 
 /** Builds Apple's type-33 credential envelope; no JavaScript crypto or credential logging. */
 final class AppleAuth {
-    static byte[] credentials(byte[] der, String username, String password) throws Exception {
+    static byte[] credentials(byte[] der,String username,String password)throws Exception{return credentials(der,username,password,null);}
+    static byte[] credentials(byte[] der,String username,String password,AppleTunnel tunnel)throws Exception {
         RSAPublicKey publicKey = publicKey(der);
         byte[] user = username.getBytes(StandardCharsets.UTF_8), pass = password.getBytes(StandardCharsets.UTF_8);
         if (user.length>63 || pass.length>63) throw new IllegalArgumentException("Mac login exceeds protocol limit");
         SecureRandom random = new SecureRandom();
         byte[] aes = new byte[16], plain = new byte[128];random.nextBytes(aes);random.nextBytes(plain);
+        try {
         System.arraycopy(user,0,plain,0,user.length);plain[user.length]=0;
         System.arraycopy(pass,0,plain,64,pass.length);plain[64+pass.length]=0;
         Cipher cipher=Cipher.getInstance("AES/ECB/NoPadding");
@@ -33,8 +35,11 @@ final class AppleAuth {
         ByteArrayOutputStream result=new ByteArrayOutputStream();
         result.write(new byte[]{1,0,'R','S','A','1',0,1});result.write(encrypted);
         result.write(wrapped.length&255);result.write(wrapped.length>>8);result.write(wrapped);
-        java.util.Arrays.fill(aes,(byte)0);java.util.Arrays.fill(plain,(byte)0);java.util.Arrays.fill(pass,(byte)0);
+        if(tunnel!=null)tunnel.retain(aes);
         return result.toByteArray();
+        } finally {
+            java.util.Arrays.fill(aes,(byte)0);java.util.Arrays.fill(plain,(byte)0);java.util.Arrays.fill(pass,(byte)0);
+        }
     }
     static void validatePublicKey(byte[] der) throws Exception { publicKey(der); }
 

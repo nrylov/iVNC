@@ -2,7 +2,7 @@
   "date": "2026-11-11",
   "package": "dev.ivnc.nativeclient",
   "libraryCommit": "98aaee0560baa0332339b2ef464ea96ed9b9b28c",
-  "localPatch": "socket-idle-rsa33-pipeline-v4",
+  "localPatch": "socket-idle-rsa33-control-v5",
   "device": "Samsung SM-S948U1",
   "nativeBuild": "PASS",
   "deviceSyntheticIntegration": {
@@ -55,7 +55,8 @@
     "typicalHandlerCpuMsPerPost": "6–10",
     "typicalRenderWallMsPerPost": "3–5 (subset of handler wall)",
     "typicalOuterSocketWaitMsPerPost": "20–25",
-    "interpretation": "Substantial update-delivery waiting; not a fixed 30fps cap. Does not isolate server encoding versus network/request timing."
+    "interpretation": "Substantial update-delivery waiting; not a fixed 30fps cap. Does not isolate server encoding versus network/request timing.",
+    "latestOwnerLog": "0.11: mostly 27–35 posts/sec pipeline on, 23–27 off, with dips; work differs so not a controlled A/B. FPS remains low with transform counts flat."
   },
   "nativeCursor": "Generic local arrow; immediate local motion and server PointerPos sync. Not server cursor artwork.",
   "requestPipelineRealMacComparison": "Installed; awaiting owner on/off comparison. No speed improvement claimed yet.",
@@ -89,5 +90,16 @@
     "changes": "Reuse Matrix, skip unchanged transforms and cursor positions",
     "galaxyRepeatedPointerTest": "PASS: 2000 unchanged pointer updates add no transforms/cursor redraws",
     "actualMacSpeedImpact": "Awaiting owner timing log; no measured speed gain claimed"
+  },
+  "nativeEncryptedControl": {
+    "exposedInViewer": false,
+    "liveMacVerified": false,
+    "independentVectors": "PASS",
+    "galaxyEncryptedZrleInputWheels": "PASS",
+    "galaxyFragmentedEncryptedRaw": "PASS",
+    "prefetchedCiphertextBoundary": "PASS",
+    "corruptRecordFailsClosedWithoutFrame": "PASS",
+    "plainCompatibilityRegression": "PASS",
+    "purpose": "Foundation for enhanced Apple session and HP negotiation; not HP support yet"
   }
 }

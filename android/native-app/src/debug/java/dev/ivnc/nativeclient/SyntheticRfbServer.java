@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit;
 final class SyntheticRfbServer implements AutoCloseable {
     final ServerSocket listener;
     final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1);
-    volatile boolean verifyWheel;
+    volatile boolean verifyWheel,encrypted,encryptionActive,corruptRecord;
+    private final SyntheticEncryptedChannel encryptedPeer=new SyntheticEncryptedChannel();
     private int wheelIndex;
     volatile Throwable failure;
     volatile boolean authenticated, zrle, requireAhead, aheadReceived, cursorPosition;
@@ -70,7 +71,15 @@ final class SyntheticRfbServer implements AutoCloseable {
             int type=input.readUnsignedByte();
             if(type==0)input.readNBytes(19);
             else if(type==2){input.readUnsignedByte();int count=input.readUnsignedShort();require(count<256,"Encoding count too large");input.readNBytes(count*4);}
+            else if(type==18){
+                require(encrypted&&!encryptionActive,"Unexpected encryption request");
+                require(java.util.Arrays.equals(input.readNBytes(11),new byte[]{0,0,1,0,1,0,1,0,0,0,1}),"Encryption request malformed");
+                ByteArrayOutputStream first=new ByteArrayOutputStream();frame(input,new DataOutputStream(first));
+                SyntheticEncryptedChannel.Streams streams=encryptedPeer.activate(aes,input,output,first.toByteArray(),corruptRecord);
+                java.util.Arrays.fill(aes,(byte)0);input=streams.input;output=streams.output;encryptionActive=true;sent=1;
+            }
             else if(type==3){input.readNBytes(9);
+                if(encrypted&&!encryptionActive)continue;
                 if(requireAhead)require(sent==0,"Duplicate next-update request after pipelined frame");
                 if(sent++<frameLimit)frame(input,output);
             }
@@ -119,5 +128,5 @@ final class SyntheticRfbServer implements AutoCloseable {
     private static byte[] join(byte[] a,byte[] b) throws Exception {ByteArrayOutputStream out=new ByteArrayOutputStream();out.write(a);out.write(b);return out.toByteArray();}
     private static String zeroString(byte[] bytes,int offset){int end=offset;while(end<offset+64&&bytes[end]!=0)end++;return new String(bytes,offset,end-offset,java.nio.charset.StandardCharsets.UTF_8);}
     private static void require(boolean value,String message){if(!value)throw new IllegalStateException(message);}
-    @Override public void close() throws Exception {listener.close();if(socket!=null)socket.close();thread.join(2000);compressor.end();}
+    @Override public void close() throws Exception {listener.close();if(socket!=null)socket.close();thread.join(2000);compressor.end();encryptedPeer.close();}
 }

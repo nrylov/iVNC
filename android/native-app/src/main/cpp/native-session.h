@@ -6,12 +6,18 @@
 #include <atomic>
 #include <mutex>
 #include <deque>
+#include <vector>
 
 /** Separates session lifetime and bounded input from the Android UI thread. */
 struct NativeSession {
     JNIEnv* env=nullptr;
     jobject events=nullptr;
-    jclass crypto=nullptr;
+    jclass crypto=nullptr,tunnelClass=nullptr;
+    jobject tunnel=nullptr;
+    std::atomic<bool> encryptionRequested{false};
+    bool encryptionPending=false,encryptionActive=false;
+    std::vector<uint8_t> decrypted;
+    size_t decryptedOffset=0;
     jstring username=nullptr, password=nullptr;
     rfbClient* client=nullptr;
     ANativeWindow* window=nullptr;
@@ -35,3 +41,6 @@ struct NativeSession {
 };
 /** Registers Apple RSA authentication through the library's native extension hook. */
 void registerAppleAuth();
+
+/** Reads/writes records through the session-owned control cipher, with metadata-only errors. */
+bool finishAppleEncryption(NativeSession* session);

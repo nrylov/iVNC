@@ -41,8 +41,8 @@ rfbBool authenticate(rfbClient* client,uint32_t type){
         session->emit("public-key","Mac RSA public key parsed; no credentials sent");
         return FALSE;
     }
-    jmethodID method=env->GetStaticMethodID(session->crypto,"credentials","([BLjava/lang/String;Ljava/lang/String;)[B");
-    auto blob=static_cast<jbyteArray>(env->CallStaticObjectMethod(session->crypto,method,key,session->username,session->password));
+    jmethodID method=env->GetStaticMethodID(session->crypto,"credentials","([BLjava/lang/String;Ljava/lang/String;Ldev/ivnc/nativeclient/AppleTunnel;)[B");
+    auto blob=static_cast<jbyteArray>(env->CallStaticObjectMethod(session->crypto,method,key,session->username,session->password,session->tunnel));
     env->DeleteLocalRef(key);
     if(env->ExceptionCheck()){env->ExceptionClear();session->emit("error","Apple credential encryption failed");return FALSE;}
     if(!blob)return FALSE;

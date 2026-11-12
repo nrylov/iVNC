@@ -1,3 +1,36 @@
+# Apple encrypted control transport checkpoint — 2026-11-12
+
+Owner's 0.11 log confirms the native speed gap persists when UI transform counts
+are flat. Approximate observed batches are mostly 27–35 posts/sec with pipeline
+on and 23–27 off (activity not controlled, so no causal benchmark claim), CPU
+~9–14ms/post, render ~3–5ms (subset) and wait ~16–31ms. Stop treating zoom redraws
+as the main limit; proceed with Apple session/HP integration as requested.
+
+Implemented native Apple encrypted TCP control path as an internal foundation,
+not a shipped High Performance option. AppleTunnel ports owned ard/ard-patch.js
+Layer 2c using platform AES-128-CBC + sequence-bound SHA-1 record validation.
+Auth AES key is retained only in the session cipher, wiped after deriving the
+session key/IV or closing; credential scratch arrays now wipe in finally. Frame-
+boundary ack precedes activation. Raw LibVNCClient buffers remain below encrypted
+record framing, so prefetched ciphertext is consumed correctly. Decrypted bytes
+are consumed/wiped and bounded; invalid lengths/hash terminate the connection.
+Plain compatibility sessions leave encryptionRequested false. JNI encryption flag
+currently only used by debug integration; enhanced session UI/setup is next.
+Patch identity socket-idle-rsa33-control-v5; submodule unchanged.
+
+Validation: project-local build PASS; independent Node-generated public cipher
+vectors/chaining/bounds/tamper/key-array cleanup PASS on project JDK. Galaxy real
+JNI/LibVNCClient encrypted ZRLE/input/wheel test PASS, fragmented encrypted Raw
+with pipeline off PASS, coalesced plaintext-handshake+ciphertext boundary PASS,
+corrupt encrypted record fail-closed/no framebuffer PASS. Plain pipelined ZRLE
+request-order/pixels/wheels PASS; authentication rejection PASS. All synthetic,
+no Mac login or desktop accessed. No live Mac encryption/HP claim.
+
+Next immediate work: enhanced 3.889 / ClientInit 0xC1, bounded Session Select,
+ViewerInfo/SetMode/SetDisplay + AutoFBUpdate push, then native HP negotiation,
+UDP/SRTP/RTP/feedback and existing stripe decoder. Native UI/zoom already verified
+by owner. Preserve Standard fallback and working hybrid; GitHub release ON HOLD.
+
 # Native UI render guard after zoom feedback — 2026-11-11
 
 Owner confirms zoom/fullscreen UX works well but performance remains worse than
