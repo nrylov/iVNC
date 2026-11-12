@@ -15,11 +15,16 @@ Mode switch releases held buttons and discards unfinished gestures.
 
 Host regressions PASS for default/mode switch, direct targeting/drag/cancel,
 scroll/pinch isolation, inverse geometry and existing behavior. Build PASS.
-0.17 is installed. Device validation pending phone unlock; wireless debugging connected. Initial
-synthetic viewer run failed because phone was locked/dozing (no TextureView).
-Use only synthetic UI/credentials/clipboard tests. Next run ViewerUxInstrumentation
-and KeyboardInstrumentation, check actual app-only UI and update evidence.
-Source is committed/pushed with this limitation; no on-device UI PASS claimed.
+0.17 is installed. After owner unlocked Galaxy, ViewerUxInstrumentation PASS:
+actual MotionEvent pinch, inverse zoomed touch targeting, direct drag, release on
+mode switch, letterbox rejection and unchanged render guard/cursor behavior.
+KeyboardInstrumentation PASS: real IME, native composition/shortcuts, accessory
+reservation and all three floating controls above keyboard without overlap. The
+first keyboard run lost window focus during the test handoff; a standalone rerun
+passed. App-only synthetic PixelCopy images reviewed: controls readable and clear
+of keyboard dock. No owner desktop/clipboard/credentials inspected. Logs/images
+are ignored .dev/native-touch-* files. Actual Mac touch feel awaits owner feedback.
+README/code and validation evidence pushed to main. Native HP remains next.
 
 # Active native repository cleanup — 2026-11-12
 

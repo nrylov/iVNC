@@ -158,7 +158,8 @@
     "geometry": "Inverse zoom/pan, letterbox rejection, clamped edges, no direct pointer-follow",
     "hostTests": "PASS: default, direct gestures, mode-switch release, multitouch isolation, inverse geometry",
     "build": "PASS; installed",
-    "deviceUi": "Pending unlock; initial run had no TextureView while phone locked/dozing",
-    "actualMac": "Awaiting owner test"
+    "deviceUi": "PASS: actual MotionEvents, zoomed absolute targeting, direct drag/release, letterbox rejection, keyboard-visible controls without overlap",
+    "actualMac": "Awaiting owner test",
+    "syntheticVisualReview": "PASS: app-only viewer and keyboard PixelCopy captures, no owner content"
   }
 }
