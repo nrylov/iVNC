@@ -28,6 +28,9 @@ public final class ViewerUxInstrumentation extends Instrumentation {
         try{
             activity=(NativeActivity)startActivitySync(new Intent(getTargetContext(),NativeActivity.class).putExtra("ivnc.synthetic",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             NativeActivity target=activity;AtomicReference<Throwable> failure=new AtomicReference<>();
+            runOnMainSync(()->target.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON));
+            long readyDeadline=android.os.SystemClock.uptimeMillis()+5000;java.util.concurrent.atomic.AtomicBoolean ready=new java.util.concurrent.atomic.AtomicBoolean();
+            do{runOnMainSync(()->{try{ready.set(((TextureView)field(target,"texture")).isAvailable());}catch(Exception ignored){}});if(ready.get())break;Thread.sleep(50);}while(android.os.SystemClock.uptimeMillis()<readyDeadline);
             waitForIdleSync();
             runOnMainSync(()->{try{
                 ((AlertDialog)field(target,"connectionPanel")).dismiss();
@@ -64,6 +67,27 @@ public final class ViewerUxInstrumentation extends Instrumentation {
                 send(target,touch,texture,MotionEvent.ACTION_UP,new float[]{250},new float[]{400});
                 require(trackpad.buttons()==1&&trackpad.dragLocked(),"Viewer gesture released drag lock on finger lift");
                 action.invoke(target,"drag-lock");require(trackpad.buttons()==0,"Viewer drag-lock action did not release");
+                // Exercise the public mode button and real transformed MotionEvents.
+                View modeButton=target.findViewById(android.R.id.content).findViewWithTag("native-input-mode");
+                require(modeButton!=null&&!trackpad.direct(),"Trackpad default/mode button missing");
+                modeButton.performClick();require(trackpad.direct()&&modeButton.getContentDescription().toString().startsWith("Touch mode"),"Mode button did not enable direct input");
+                float touchX=texture.getWidth()*.45f,touchY=texture.getHeight()*.55f;
+                float expectedX=viewport.remoteX(touchX),expectedY=viewport.remoteY(touchY),oldLeft=viewport.left(),oldTop=viewport.top();
+                send(target,touch,texture,MotionEvent.ACTION_DOWN,new float[]{touchX},new float[]{touchY});
+                near((float)field(target,"cursorX"),expectedX);near((float)field(target,"cursorY"),expectedY);
+                send(target,touch,texture,MotionEvent.ACTION_MOVE,new float[]{touchX+100},new float[]{touchY});
+                require(trackpad.buttons()==1,"Direct swipe did not drag");near((float)field(target,"cursorX"),viewport.remoteX(touchX+100));
+                near(viewport.left(),oldLeft);near(viewport.top(),oldTop);
+                modeButton.performClick();require(!trackpad.direct()&&trackpad.buttons()==0,"Mode switch failed to release drag");
+                send(target,touch,texture,MotionEvent.ACTION_UP,new float[]{touchX+100},new float[]{touchY});
+                modeButton.performClick();action.invoke(target,"fit");
+                if(viewport.top()>1){
+                    float previousX=(float)field(target,"cursorX"),previousY=(float)field(target,"cursorY");
+                    send(target,touch,texture,MotionEvent.ACTION_DOWN,new float[]{texture.getWidth()/2f},new float[]{0});
+                    send(target,touch,texture,MotionEvent.ACTION_UP,new float[]{texture.getWidth()/2f},new float[]{0});
+                    near((float)field(target,"cursorX"),previousX);near((float)field(target,"cursorY"),previousY);
+                }
+                modeButton.performClick();action.invoke(target,"zoom-in");
                 Matrix matrix=texture.getTransform(null);RectF mapped=new RectF(0,0,texture.getWidth(),texture.getHeight());matrix.mapRect(mapped);
                 near(mapped.left,viewport.left());near(mapped.top,viewport.top());near(mapped.width(),viewport.imageWidth());near(mapped.height(),viewport.imageHeight());
                 require(target.findViewById(android.R.id.content).findViewWithTag("native-status").getVisibility()==View.GONE,"Connected toolbar still covers desktop");
@@ -78,7 +102,7 @@ public final class ViewerUxInstrumentation extends Instrumentation {
             android.view.PixelCopy.request(target.getWindow(),screenshot,value->{copyResult.set(value);copied.countDown();},new android.os.Handler(android.os.Looper.getMainLooper()));
             require(copied.await(5,java.util.concurrent.TimeUnit.SECONDS)&&copyResult.get()==android.view.PixelCopy.SUCCESS,"Synthetic app-window copy failed");
             try(FileOutputStream file=getTargetContext().openFileOutput("synthetic-viewer-ux.png",0)){screenshot.compress(Bitmap.CompressFormat.PNG,100,file);}finally{screenshot.recycle();}
-            result.putString("stream","PASS: actual MotionEvent pinch, TextureView focal transform, 2000 unchanged pointer updates skipped, cursor deduplication, hidden connected toolbar and floating menu; synthetic UI screenshot saved. No Mac connection.");finish(Activity.RESULT_OK,result);
+            result.putString("stream","PASS: actual MotionEvent pinch, TextureView focal transform, 2000 unchanged pointer updates skipped, cursor deduplication, hidden toolbar, floating mode button, absolute zoomed targeting, direct drag/release and letterbox rejection; synthetic UI screenshot saved. No Mac connection.");finish(Activity.RESULT_OK,result);
         }catch(Throwable error){result.putString("stream","VIEWER UX FAILED: "+error);finish(Activity.RESULT_CANCELED,result);}
         finally{if(activity!=null){NativeActivity target=activity;runOnMainSync(target::finish);}}
     }

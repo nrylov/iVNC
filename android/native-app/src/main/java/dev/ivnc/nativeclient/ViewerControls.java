@@ -1,4 +1,4 @@
-/* A single unobtrusive native control above the desktop, with secondary tools in a popup. */
+/* Unobtrusive native keyboard, input-mode and menu controls above the desktop. */
 package dev.ivnc.nativeclient;
 
 import android.app.Activity;
@@ -19,12 +19,12 @@ final class ViewerControls {
     }
     static void reserved(FrameLayout root,int bottom){
         android.view.WindowInsets insets=root.getRootWindowInsets();int safe=insets==null?0:insets.getInsets(android.view.WindowInsets.Type.systemBars()).bottom;
-        for(String tag:new String[]{"native-viewer-menu","native-keyboard-button"}){
+        for(String tag:new String[]{"native-viewer-menu","native-keyboard-button","native-input-mode"}){
             android.view.View button=root.findViewWithTag(tag);if(button==null)continue;
             FrameLayout.LayoutParams layout=(FrameLayout.LayoutParams)button.getLayoutParams();int margin=Math.max(safe,bottom)+(int)(12*root.getResources().getDisplayMetrics().density);if(layout.bottomMargin!=margin){layout.bottomMargin=margin;button.setLayoutParams(layout);}
         }
     }
-    static void attach(Activity activity,FrameLayout root,Supplier<String> status,Supplier<Boolean> pipeline,Supplier<Boolean> dragging,java.util.function.IntSupplier reserved,Consumer<String> action){
+    static void attach(Activity activity,FrameLayout root,Supplier<String> status,Supplier<Boolean> pipeline,Supplier<Boolean> dragging,Supplier<Boolean> direct,java.util.function.IntSupplier reserved,Consumer<String> action){
         float density=activity.getResources().getDisplayMetrics().density;
         Button button=new Button(activity);button.setText("⋮");button.setTextSize(25);button.setTextColor(0xffffffff);
         button.setPadding(0,0,0,0);button.setAlpha(.65f);button.setContentDescription("Viewer options");button.setTag("native-viewer-menu");
@@ -45,6 +45,15 @@ final class ViewerControls {
             keyboardPosition.rightMargin=safe.right+(int)(72*density);keyboardPosition.bottomMargin=Math.max(safe.bottom,reserved.getAsInt())+(int)(12*density);keyboard.setLayoutParams(keyboardPosition);return insets;
         });
         keyboard.setOnClickListener(view->action.accept("keyboard"));
+        Button mode=new Button(activity);mode.setTextSize(10);mode.setTextColor(0xffffffff);mode.setPadding(0,0,0,0);mode.setAlpha(.65f);mode.setTag("native-input-mode");
+        GradientDrawable modeBackground=new GradientDrawable();modeBackground.setColor(0xcc17283b);modeBackground.setCornerRadius(100*density);mode.setBackground(modeBackground);
+        FrameLayout.LayoutParams modePosition=new FrameLayout.LayoutParams((int)(48*density),(int)(48*density),Gravity.BOTTOM|Gravity.END);
+        modePosition.rightMargin=(int)(132*density);modePosition.bottomMargin=(int)(12*density);root.addView(mode,modePosition);inputMode(mode,direct.get());
+        mode.setOnApplyWindowInsetsListener((view,insets)->{
+            android.graphics.Insets safe=insets.getInsets(android.view.WindowInsets.Type.systemBars()|android.view.WindowInsets.Type.displayCutout());
+            modePosition.rightMargin=safe.right+(int)(132*density);modePosition.bottomMargin=Math.max(safe.bottom,reserved.getAsInt())+(int)(12*density);mode.setLayoutParams(modePosition);return insets;
+        });
+        mode.setOnClickListener(view->{action.accept("input-mode");inputMode(mode,direct.get());});
         button.setOnClickListener(view->{
             PopupMenu menu=new PopupMenu(activity,button);
             menu.getMenu().add(status.get()).setEnabled(false);
@@ -60,5 +69,10 @@ final class ViewerControls {
                 else if(id>=0&&id<items.length)action.accept(items[id][1]);return true;
             });menu.show();
         });
+    }
+    private static void inputMode(Button button,boolean direct){
+        button.setText(direct?"TOUCH":"PAD");
+        String description=(direct?"Touch mode. Switch to trackpad mode":"Trackpad mode. Switch to touch mode");
+        button.setContentDescription(description);button.setTooltipText(description);
     }
 }

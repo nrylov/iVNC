@@ -219,3 +219,17 @@ delayed retry, addressing missing startup areas; **Refresh desktop** is also in
 the menu. Synthetic Galaxy tests verify complete image recovery without pointer
 input, encrypted clipboard exchange, secure storage and lifecycle reconnection.
 Actual Mac 0.15 verification is pending; owner confirmed dragging works in 0.14.
+
+
+## Touch and trackpad input (0.17)
+
+Trackpad is the default. The floating **PAD / TOUCH** button switches modes next
+to the keyboard and options buttons. It shows the current mode; its accessibility
+label describes the next action. Switching modes cancels the current gesture and
+releases held buttons.
+
+In touch mode, tap directly on the visible desktop to click, or slide one finger
+to drag/select. Coordinates follow the current zoom and pan. Letterbox taps are
+ignored and dragging past an image edge clamps to that edge. Pointer-follow
+panning stays off in touch mode to keep targets under your finger. Two-finger
+scrolling, two-finger right-click and pinch zoom remain available in both modes.

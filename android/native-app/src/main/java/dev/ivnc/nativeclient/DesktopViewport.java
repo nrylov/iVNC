@@ -16,6 +16,11 @@ final class DesktopViewport {
     float top(){return (viewHeight-imageHeight())/2+panY;}
     float x(float remoteX){return left()+remoteX*scale();}
     float y(float remoteY){return top()+remoteY*scale();}
+    /** Maps a screen contact back through the same zoom/pan transform used to draw. */
+    float remoteX(float screenX){return Math.max(0,Math.min(frameWidth-1,(screenX-left())/scale()));}
+    float remoteY(float screenY){return Math.max(0,Math.min(frameHeight-1,(screenY-top())/scale()));}
+    /** Letterbox contacts should not click the closest desktop edge. */
+    boolean contains(float screenX,float screenY){return screenX>=left()&&screenY>=top()&&screenX<left()+imageWidth()&&screenY<top()+imageHeight();}
     void reset(){zoom=1;panX=panY=0;}
     void zoomBy(float factor,float focusX,float focusY){
         float remoteX=(focusX-left())/scale(),remoteY=(focusY-top())/scale();

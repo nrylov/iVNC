@@ -10,7 +10,8 @@ runtime or JavaScript assets.
 - Apple type-33 RSA/AES login, enhanced 3.889 console setup and encrypted control.
 - Server-pushed Standard framebuffer updates, ZRLE and standard fallback codecs;
   compatibility mode supports the older request-driven path.
-- Full-screen trackpad, local cursor, pinch zoom, pointer-follow panning, adjustable
+- Full-screen touch/trackpad toggle (trackpad default), local cursor, pinch zoom,
+  pointer-follow panning in trackpad mode, adjustable
   scrolling, drag selection and an advanced keyboard.
 - One Keystore-encrypted remembered login and foreground/process-return reconnect.
 - Bidirectional bounded text clipboard in enhanced mode and explicit Get/Send actions.

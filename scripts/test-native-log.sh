@@ -33,3 +33,6 @@ javac -cp "$ANDROID_STUBS" -d "$OUT" \
   "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativeclient/ClipboardSync.java" \
   "$PROJECT_ROOT/android/native-app/tests/ClipboardSyncTest.java"
 java -cp "$OUT:$ANDROID_STUBS" dev.ivnc.nativeclient.ClipboardSyncTest
+
+javac -cp "$OUT" -d "$OUT" "$PROJECT_ROOT/android/native-app/tests/NativeTouchTest.java"
+java -cp "$OUT" dev.ivnc.nativeclient.NativeTouchTest

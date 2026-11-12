@@ -19,6 +19,10 @@ public final class DesktopViewportTest {
         view.resize(600,1200,1920,1080);near(view.left(),0);near(view.top(),431.25f);
         view.zoomBy(2,300,600);view.follow(0,0);near(view.top(),262.5f); // Fitted vertical axis remains centered.
         view.reset();near(view.zoom(),1);near(view.top(),431.25f);
+        require(!view.contains(300,10)&&view.contains(300,600),"Letterbox hit testing failed");
+        view.zoomBy(3,250,650);view.panBy(-100,20);
+        near(view.remoteX(view.x(500)),500);near(view.remoteY(view.y(600)),600);
+        near(view.remoteX(-100000),0);near(view.remoteY(100000),1079);
         System.out.println("PASS: native focal zoom, fit limits, portrait letterboxing, bounded pan and pointer-follow navigation");
     }
     private static void near(float actual,float expected){require(Math.abs(actual-expected)<.02f,"Geometry mismatch: "+actual+" vs "+expected);}

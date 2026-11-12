@@ -1,3 +1,26 @@
+# Native 0.17 touch mode and project motivation — 2026-11-12
+
+Owner requests README motivation plus restored touch input with trackpad default
+and a button to switch. README explains the personal goal: remotely control a Mac
+from Android with clipboard, performance/Apple HP and comfortable input/zoom. HP
+remains explicitly pending in native.
+
+Native 0.17 adds floating PAD / TOUCH control alongside keyboard/menu, with current
+mode label, accessible action description and keyboard-safe layout. Trackpad is
+initial default (not stored as a profile preference). Touch taps target the desktop
+directly; one-finger swipe presses after tap slop and drags until lift. Zoom/pan
+inverse geometry matches video; letterbox taps ignored, edge drags clamped, pointer
+follow disabled in direct mode. Shared pinch/two-finger scroll/right-click remain.
+Mode switch releases held buttons and discards unfinished gestures.
+
+Host regressions PASS for default/mode switch, direct targeting/drag/cancel,
+scroll/pinch isolation, inverse geometry and existing behavior. Build PASS.
+0.17 is installed. Device validation pending phone unlock; wireless debugging connected. Initial
+synthetic viewer run failed because phone was locked/dozing (no TextureView).
+Use only synthetic UI/credentials/clipboard tests. Next run ViewerUxInstrumentation
+and KeyboardInstrumentation, check actual app-only UI and update evidence.
+Source is committed/pushed with this limitation; no on-device UI PASS claimed.
+
 # Active native repository cleanup — 2026-11-12
 
 Owner requests removal of obsolete browser dependency references. Main now contains

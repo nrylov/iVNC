@@ -31,7 +31,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private final DesktopViewport viewport=new DesktopViewport();
     private CursorOverlay cursor;
     private android.widget.ToggleButton pipeline;
-    private boolean connected,touchActive;
+    private boolean connected,touchActive,ignoreTouch;
     private long lastLocalPointerAt;
     private static final long CURSOR_ECHO_GRACE_MS=150;
     private Surface surface;
@@ -70,13 +70,14 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             connection.input(handle->NativeRfb.pipeline(handle,enabled));
             debugLog.add("status","Update request pipeline "+(enabled?"enabled":"disabled")+" for subsequent updates");
         });
-        ViewerControls.attach(this,root,()->(connected?"Connected":"Disconnected")+" · "+Math.round(viewport.zoom()*100)+"%",pipeline::isChecked,()->trackpad!=null&&trackpad.dragLocked(),()->keyboardReserved,this::viewerAction);
+        ViewerControls.attach(this,root,()->(connected?"Connected":"Disconnected")+" · "+Math.round(viewport.zoom()*100)+"%",pipeline::isChecked,()->trackpad!=null&&trackpad.dragLocked(),()->trackpad!=null&&trackpad.direct(),()->keyboardReserved,this::viewerAction);
         trackpad=new NativeTrackpad(getResources().getDisplayMetrics().density,new NativeTrackpad.Output(){
             public void move(float dx,float dy){
                 float scale=Math.max(.01f,viewport.scale());
                 cursorX=Math.max(0,Math.min(width-1,cursorX+dx/scale));
                 cursorY=Math.max(0,Math.min(height-1,cursorY+dy/scale));pointer(trackpad.buttons());
             }
+            public void position(float x,float y){cursorX=viewport.remoteX(x);cursorY=viewport.remoteY(y);pointer(trackpad.buttons());}
             public void zoom(float factor,float x,float y,float dx,float dy){
                 viewport.zoomBy(factor,x-dx,y-dy);viewport.panBy(dx,dy);applyViewport();
             }
@@ -186,6 +187,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     }
     private void viewerAction(String action){
         switch(action){
+            case "input-mode":trackpad.setDirect(!trackpad.direct());touchActive=false;break;
             case "keyboard":trackpad.cancel();keyboardDock.toggle();break;
             case "drag-lock":
                 if(connected)trackpad.setDragLocked(!trackpad.dragLocked());else android.widget.Toast.makeText(this,"Connect to your Mac first",android.widget.Toast.LENGTH_SHORT).show();break;
@@ -201,15 +203,17 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             case "zoom-in":case "zoom-out":
                 viewport.zoomBy(action.equals("zoom-in")?1.4f:1/1.4f,texture.getWidth()/2f,texture.getHeight()/2f);applyViewport();break;
             case "help":new AlertDialog.Builder(this).setTitle("Desktop gestures")
-                .setMessage("Slide one finger to move the pointer. Tap to click. Double-tap with one finger, keep it down after the second tap, then slide to drag. Lift to release.\n\nFor longer text selections, enable Drag lock in the menu, slide one finger (lift and reposition as needed), then turn Drag lock off to release.\n\nSlide two fingers together to scroll; tap with two fingers to right-click.\n\nPinch to zoom. When zoomed in, the view follows your pointer near its edges—keep using one finger to reach the rest of the desktop.\n\nUse Fit desktop to show the whole screen.")
+                .setMessage("Use the PAD / TOUCH button to switch input modes. Trackpad is the default. In touch mode, tap the target directly; slide one finger to drag or select text. Two-finger scrolling and pinch zoom work in both modes.\n\nIn trackpad mode: slide one finger to move the pointer. Tap to click. Double-tap with one finger, keep it down after the second tap, then slide to drag. Lift to release.\n\nFor longer text selections, enable Drag lock in the menu, slide one finger (lift and reposition as needed), then turn Drag lock off to release.\n\nSlide two fingers together to scroll; tap with two fingers to right-click.\n\nPinch to zoom. When zoomed in, the view follows your pointer near its edges—keep using one finger to reach the rest of the desktop.\n\nUse Fit desktop to show the whole screen.")
                 .setPositiveButton("Done",null).show();break;
         }
     }
-    private void fit(){viewport.resize(texture.getWidth(),texture.getHeight(),width,height);viewport.follow(cursorX,cursorY);applyViewport();}
+    private void fit(){viewport.resize(texture.getWidth(),texture.getHeight(),width,height);if(trackpad==null||!trackpad.direct())viewport.follow(cursorX,cursorY);applyViewport();}
     private void applyViewport(){renderer.apply(viewport);updateCursor();}
     private void updateCursor(){cursor.position(width,height,cursorX,cursorY);}
     private boolean touch(View view,MotionEvent event){
         int action=event.getActionMasked(),index=event.getActionIndex();
+        if(action==MotionEvent.ACTION_DOWN)ignoreTouch=trackpad.direct()&&!viewport.contains(event.getX(),event.getY());
+        if(ignoreTouch)return true;
         if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_POINTER_DOWN){
             touchActive=true;trackpad.down(event.getPointerId(index),event.getX(index),event.getY(index),event.getEventTime());
         }else if(action==MotionEvent.ACTION_MOVE){
@@ -221,7 +225,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         }else if(action==MotionEvent.ACTION_CANCEL){trackpad.cancel();touchActive=false;}
         return true;
     }
-    private void pointer(int buttons){lastLocalPointerAt=android.os.SystemClock.uptimeMillis();viewport.follow(cursorX,cursorY);applyViewport();connection.input(handle->NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons));}
+    private void pointer(int buttons){lastLocalPointerAt=android.os.SystemClock.uptimeMillis();if(trackpad==null||!trackpad.direct())viewport.follow(cursorX,cursorY);applyViewport();connection.input(handle->NativeRfb.pointer(handle,(int)cursorX,(int)cursorY,buttons));}
     private void offline(){
         if(keyboardDock!=null)keyboardDock.clear();connected=screenReady=false;touchActive=false;clipboard.ready(false);
         if(trackpad!=null)trackpad.cancel();if(cursor!=null)cursor.setVisibility(View.INVISIBLE);

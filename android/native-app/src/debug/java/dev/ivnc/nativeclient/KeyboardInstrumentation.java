@@ -33,10 +33,12 @@ public final class KeyboardInstrumentation extends Instrumentation {
             runOnMainSync(()->{try{
                 View menu=target.findViewById(android.R.id.content).findViewWithTag("native-viewer-menu");
                 View keyboard=target.findViewById(android.R.id.content).findViewWithTag("native-keyboard-button");
+                View mode=target.findViewById(android.R.id.content).findViewWithTag("native-input-mode");
                 View texture=(View)field(target,"texture");View cursor=(View)field(target,"cursor");
                 FrameLayout root=(FrameLayout)menu.getParent();
                 require(texture.getHeight()<root.getHeight()&&texture.getHeight()==cursor.getHeight(),"Production viewer/cursor did not reserve keyboard space");
-                require(menu.getBottom()<=texture.getHeight()&&keyboard.getBottom()<=texture.getHeight(),"Floating controls were hidden by keyboard dock");
+                require(menu.getBottom()<=texture.getHeight()&&keyboard.getBottom()<=texture.getHeight()&&mode.getBottom()<=texture.getHeight(),"Floating controls were hidden by keyboard dock");
+                require(mode.getRight()<=keyboard.getLeft()&&keyboard.getRight()<=menu.getLeft(),"Floating controls overlap");
             }catch(Throwable error){failure.set(error);}});
             if(failure.get()!=null)throw new IllegalStateException(failure.get());
             capture(target);

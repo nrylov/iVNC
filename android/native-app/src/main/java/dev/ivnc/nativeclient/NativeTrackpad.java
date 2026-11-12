@@ -9,6 +9,7 @@ final class NativeTrackpad {
     interface Output {
         void move(float dx,float dy); void click(int button); void wheel(int mask);
         default void hold(boolean down){}
+        default void position(float x,float y){}
         default void zoom(float factor,float x,float y,float dx,float dy){}
     }
     private enum Mode { PENDING,SCROLL,PINCH }
@@ -22,7 +23,10 @@ final class NativeTrackpad {
     private int maximum;
     private long started;
     private Mode mode=Mode.PENDING;
-    private boolean dragLocked,tapDragging,suppressTap;
+    private boolean dragLocked,tapDragging,suppressTap,direct;
+    boolean direct(){return direct;}
+    /** Switching input mode releases held buttons and discards unfinished gestures. */
+    void setDirect(boolean value){if(direct!=value){cancel();direct=value;}}
     private long lastTap=Long.MIN_VALUE;
     private float lastTapX,lastTapY,downX,downY;
     int buttons(){return dragLocked||tapDragging?1:0;}
@@ -39,6 +43,7 @@ final class NativeTrackpad {
     void setScrollSpeed(int multiplier){scrollStep=baseScrollStep/Math.max(1,Math.min(24,multiplier));scrollX=scrollY=0;}
     void down(int id,float x,float y,long time){
         if(contacts.isEmpty()){
+            if(direct)output.position(x,y);
             maximum=0;started=time;distance=scrollX=scrollY=0;mode=Mode.PENDING;suppressTap=false;downX=x;downY=y;
             if(!dragLocked&&lastTap!=Long.MIN_VALUE&&time>=lastTap&&time-lastTap<=300&&Math.hypot(x-lastTapX,y-lastTapY)<=24*density){
                 tapDragging=true;output.hold(true);
@@ -57,7 +62,14 @@ final class NativeTrackpad {
         for(int i=0;i<ids.length;i++){
             float[] previous=contacts.get(ids[i]);if(previous==null)continue;
             float dx=xs[i]-previous[0],dy=ys[i]-previous[1];previous[0]=xs[i];previous[1]=ys[i];distance+=Math.hypot(dx,dy);
-            if(maximum==1)output.move(dx,dy);
+            if(maximum==1){
+                if(direct){
+                    // A direct swipe drags; defer the press past tap slop so a
+                    // second finger can begin scrolling/pinching without a click.
+                    if(buttons()==0&&distance>tapSlop){tapDragging=true;output.hold(true);}
+                    output.position(xs[i],ys[i]);
+                }else output.move(dx,dy);
+            }
         }
         if(maximum!=2||contacts.size()!=2)return;
         float[] now=geometry();float travel=(float)Math.hypot(now[0]-originX,now[1]-originY),spread=Math.abs(now[2]-originSpan);

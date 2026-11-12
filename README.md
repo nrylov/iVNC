@@ -3,10 +3,21 @@
 Native Android client for macOS built-in Screen Sharing, using LibVNCClient with
 Apple-specific authentication, encrypted control messages and clipboard support.
 
-The viewer includes full-screen trackpad control, pinch zoom, pointer-follow
+The viewer includes full-screen touch and trackpad control, pinch zoom, pointer-follow
 panning, drag selection, an advanced keyboard, encrypted saved login and
 reconnection when returning from another app. Native High Performance media is
 still being implemented; current sessions use enhanced Apple Standard mode.
+
+## Motivation
+
+I wanted to control my Mac from my Android phone with reliable clipboard sharing,
+responsive performance, Apple's High Performance mode, and everyday conveniences
+such as zoom, direct touch and trackpad control. I couldn't find an app that
+combined those features in a way that worked for me, so I started building iVNC.
+
+The goal is a comfortable remote desktop that works with macOS built-in Screen
+Sharing. Clipboard, zoom and input controls are available today; native High
+Performance support is the next major milestone.
 
 ## Build
 
