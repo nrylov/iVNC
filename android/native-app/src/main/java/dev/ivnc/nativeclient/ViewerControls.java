@@ -24,7 +24,7 @@ final class ViewerControls {
             FrameLayout.LayoutParams layout=(FrameLayout.LayoutParams)button.getLayoutParams();int margin=Math.max(safe,bottom)+(int)(12*root.getResources().getDisplayMetrics().density);if(layout.bottomMargin!=margin){layout.bottomMargin=margin;button.setLayoutParams(layout);}
         }
     }
-    static void attach(Activity activity,FrameLayout root,Supplier<String> status,Supplier<Boolean> pipeline,java.util.function.IntSupplier reserved,Consumer<String> action){
+    static void attach(Activity activity,FrameLayout root,Supplier<String> status,Supplier<Boolean> pipeline,Supplier<Boolean> dragging,java.util.function.IntSupplier reserved,Consumer<String> action){
         float density=activity.getResources().getDisplayMetrics().density;
         Button button=new Button(activity);button.setText("⋮");button.setTextSize(25);button.setTextColor(0xffffffff);
         button.setPadding(0,0,0,0);button.setAlpha(.65f);button.setContentDescription("Viewer options");button.setTag("native-viewer-menu");
@@ -51,11 +51,12 @@ final class ViewerControls {
             String[][] items={{"Connection…","connection"},{"Zoom in","zoom-in"},{"Zoom out","zoom-out"},
                 {"Fit desktop","fit"},{"Scroll sensitivity…","scroll"},{"Gesture help","help"},{"Disconnect","disconnect"}};
             for(int i=0;i<items.length;i++)menu.getMenu().add(0,i,i+1,items[i][0]);
+            menu.getMenu().add(0,300,4,"Drag lock").setCheckable(true).setChecked(dragging.get());
             android.view.SubMenu advanced=menu.getMenu().addSubMenu(0,200,20,"Diagnostics");
             advanced.add(0,100,0,"Pipeline updates").setCheckable(true).setChecked(pipeline.get());
             advanced.add(0,101,1,"Debug log");
             menu.setOnMenuItemClickListener(item->{
-                int id=item.getItemId();if(id==200)return false;if(id==100)action.accept("pipeline");else if(id==101)action.accept("log");
+                int id=item.getItemId();if(id==300){action.accept("drag-lock");return true;}if(id==200)return false;if(id==100)action.accept("pipeline");else if(id==101)action.accept("log");
                 else if(id>=0&&id<items.length)action.accept(items[id][1]);return true;
             });menu.show();
         });

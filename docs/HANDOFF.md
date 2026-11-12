@@ -1,3 +1,36 @@
+# Native dragging and text selection — 2026-11-12
+
+Owner confirms the dedicated 0.13 keyboard works well, then requests dragging /
+text selection. Native 0.14-native-drag is built/installed/opened on Galaxy.
+
+Two controls: (1) double-tap with one finger, keep the second tap down and slide;
+left button stays held until finger lift. (2) ⋮ -> Drag lock holds left across
+finger lifts for long selections; turn it off to release. Cursor fill turns blue
+while held. Pointer-follow panning remains active when zoomed, allowing selection
+across hidden desktop areas. Keyboard/connection controls, multi-touch/cancel,
+stop and disconnect clear held state. A short second tap still produces a normal
+second click; distant contacts do not trigger tap-drag. Gesture help updated.
+
+Native pointer queue coalesces only motion, preserving exact button-transition
+coordinates. Reserves room for transitions, prioritizes them over replaceable
+motion, and disconnects as a fail-safe if a non-droppable full queue cannot accept
+a transition. Keyboard batches leave two slots available. Wheel press/release
+pairs remain atomic. No selected text or pointer coordinates are logged.
+
+Validation: project-local build PASS; host log/keyboard/cipher/gesture/viewport and
+new drag tests PASS (tap-drag, clutching, cancellation/multitouch release, distant
+contact isolation). Galaxy native protocol tests PASS in enhanced encryption and
+compatibility: exact pixels/auth/wheel/keyboard plus 1000 pointer motions with left
+held and final release at correct position. Galaxy actual viewer MotionEvent test
+PASS for lock across finger lift and menu-action release; cursor bitmap test PASS
+for blue held-state indicator and existing geometry/visibility. No real Mac text
+selection verified yet; owner should try both controls in a blank document/window.
+
+Native High Performance remains the next requested major milestone. Apple enhanced
+setup/encryption/push is verified live by owner and greatly improves Standard;
+HP negotiation/virtual session and native media transport/decoder integration are
+still pending. Preserve working hybrid, native UI/keyboard, and GitHub release hold.
+
 # Native Standard performance confirmed; dedicated keyboard — 2026-11-12
 
 Owner tested 0.12 with Compatibility unchecked: "a lot smoother". Pasted tail

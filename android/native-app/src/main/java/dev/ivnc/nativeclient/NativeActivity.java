@@ -62,16 +62,17 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             synchronized(lifetime){if(handle!=0)NativeRfb.pipeline(handle,enabled);}
             debugLog.add("status","Update request pipeline "+(enabled?"enabled":"disabled")+" for subsequent updates");
         });
-        ViewerControls.attach(this,root,()->(connected?"Connected":"Disconnected")+" · "+Math.round(viewport.zoom()*100)+"%",pipeline::isChecked,()->keyboardReserved,this::viewerAction);
+        ViewerControls.attach(this,root,()->(connected?"Connected":"Disconnected")+" · "+Math.round(viewport.zoom()*100)+"%",pipeline::isChecked,()->trackpad!=null&&trackpad.dragLocked(),()->keyboardReserved,this::viewerAction);
         trackpad=new NativeTrackpad(getResources().getDisplayMetrics().density,new NativeTrackpad.Output(){
             public void move(float dx,float dy){
                 float scale=Math.max(.01f,viewport.scale());
                 cursorX=Math.max(0,Math.min(width-1,cursorX+dx/scale));
-                cursorY=Math.max(0,Math.min(height-1,cursorY+dy/scale));pointer(0);
+                cursorY=Math.max(0,Math.min(height-1,cursorY+dy/scale));pointer(trackpad.buttons());
             }
             public void zoom(float factor,float x,float y,float dx,float dy){
                 viewport.zoomBy(factor,x-dx,y-dy);viewport.panBy(dx,dy);applyViewport();
             }
+            public void hold(boolean down){cursor.dragging(down);pointer(down?1:0);}
             public void click(int button){pointer(button);pointer(0);}
             public void wheel(int mask){synchronized(lifetime){if(handle!=0)NativeRfb.wheel(handle,(int)cursorX,(int)cursorY,mask);}}
         });
@@ -150,7 +151,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         }
         debugLog.add(kind,kind.equals("metrics")?value+" "+renderer.counters():value);
         if(kind.equals("status")&&value.startsWith("Native standard VNC connected"))connected=true;
-        if(kind.equals("error")||(kind.equals("status")&&value.equals("Native connection ended"))){connected=false;cursor.setVisibility(View.INVISIBLE);}
+        if(kind.equals("error")||(kind.equals("status")&&value.equals("Native connection ended"))){connected=false;trackpad.cancel();cursor.setVisibility(View.INVISIBLE);}
         if(kind.equals("metrics")||kind.equals("protocol"))return;
         if(kind.equals("error")){if(errorShown)return;errorShown=true;}
         else if(kind.equals("status")&&value.startsWith("Connecting"))errorShown=false;
@@ -164,8 +165,10 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     }
     private void viewerAction(String action){
         switch(action){
-            case "keyboard":keyboardDock.toggle();break;
-            case "connection":connectionDialog();break;
+            case "keyboard":trackpad.cancel();keyboardDock.toggle();break;
+            case "drag-lock":
+                if(connected)trackpad.setDragLocked(!trackpad.dragLocked());else android.widget.Toast.makeText(this,"Connect to your Mac first",android.widget.Toast.LENGTH_SHORT).show();break;
+            case "connection":trackpad.cancel();keyboardDock.hide();connectionDialog();break;
             case "log":showDebugLog();break;
             case "pipeline":pipeline.setChecked(!pipeline.isChecked());break;
             case "scroll":ScrollSettings.show(this,speed->trackpad.setScrollSpeed(speed));break;
@@ -174,7 +177,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             case "zoom-in":case "zoom-out":
                 viewport.zoomBy(action.equals("zoom-in")?1.4f:1/1.4f,texture.getWidth()/2f,texture.getHeight()/2f);applyViewport();break;
             case "help":new AlertDialog.Builder(this).setTitle("Desktop gestures")
-                .setMessage("Slide one finger to move the pointer. Tap to click.\n\nSlide two fingers together to scroll; tap with two fingers to right-click.\n\nPinch to zoom. When zoomed in, the view follows your pointer near its edges—keep using one finger to reach the rest of the desktop.\n\nUse Fit desktop to show the whole screen.")
+                .setMessage("Slide one finger to move the pointer. Tap to click. Double-tap with one finger, keep it down after the second tap, then slide to drag. Lift to release.\n\nFor longer text selections, enable Drag lock in the menu, slide one finger (lift and reposition as needed), then turn Drag lock off to release.\n\nSlide two fingers together to scroll; tap with two fingers to right-click.\n\nPinch to zoom. When zoomed in, the view follows your pointer near its edges—keep using one finger to reach the rest of the desktop.\n\nUse Fit desktop to show the whole screen.")
                 .setPositiveButton("Done",null).show();break;
         }
     }

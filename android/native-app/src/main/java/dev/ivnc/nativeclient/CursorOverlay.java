@@ -17,6 +17,8 @@ final class CursorOverlay extends View {
     private float lastX=Float.NaN,lastY;
     private int lastWidth,lastHeight;
     private long redraws;
+    private boolean dragging;
+    void dragging(boolean held){if(dragging!=held){dragging=held;redraws++;invalidate();}}
     long redraws(){return redraws;}
     void viewport(DesktopViewport value){viewport=value;invalidate();}
     CursorOverlay(Context context){
@@ -41,6 +43,6 @@ final class CursorOverlay extends View {
             viewport==null?ViewportMath.y(getHeight(),frameHeight,scale,remoteY):viewport.y(remoteY));
         float density=getResources().getDisplayMetrics().density;canvas.scale(density,density);
         paint.setColor(0xff080c12);paint.setStyle(Paint.Style.STROKE);paint.setStrokeJoin(Paint.Join.ROUND);paint.setStrokeWidth(3);canvas.drawPath(arrow,paint);
-        paint.setColor(0xfffcfcfc);paint.setStyle(Paint.Style.FILL);canvas.drawPath(arrow,paint);canvas.restore();
+        paint.setColor(dragging?0xff80c9ff:0xfffcfcfc);paint.setStyle(Paint.Style.FILL);canvas.drawPath(arrow,paint);canvas.restore();
     }
 }

@@ -50,14 +50,14 @@ particular frame rate.
 
 ## Current status (2026-11-12)
 
-Native 0.13 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
+Native 0.14 uses LibVNCClient without WebView/noVNC runtime. The owner has verified
 Mac login, live 1920×1080 Standard updates, relative pointer input and two-finger
 scrolling. Synthetic/device regressions cover Apple RSA/AES auth, fragmented
 reads, exact native pixels, cursor, pipeline request ordering and wheel packets.
 It also has full-screen controls, native pinch zoom, pointer-follow panning,
 adjustable scroll speed and a dedicated advanced keyboard. Owner confirmed zoom
 and much smoother enhanced Apple Standard with 3.889/push updates. Native key/IME
-regressions pass; real Mac typing feedback is pending. See HANDOFF.md and
+regressions pass; owner confirms native keyboard typing works. Native tap-drag/drag lock are now implemented, with real Mac selection feedback pending. See HANDOFF.md and
 native-client-galaxy-s26.json for current validation and limitations.
 
 Owner's next requested milestone is High Performance. The existing hybrid has

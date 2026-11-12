@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit;
 /** No real Mac login, screen contents or session secrets enter this test. */
 final class SyntheticRfbServer implements AutoCloseable {
     final ServerSocket listener;
-    final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1),keyboard=new CountDownLatch(1);
+    final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1),keyboard=new CountDownLatch(1),drag=new CountDownLatch(1);
+    private boolean dragStarted;
     private int keyboardIndex;
     volatile boolean verifyWheel,encrypted,encryptionActive,corruptRecord,enhanced,zeroGeometry;
     private boolean displayMetadataSent;
@@ -107,11 +108,18 @@ final class SyntheticRfbServer implements AutoCloseable {
                 byte[] keyEvent=cipher.doFinal(protectedKey);require((keyEvent[0]&255)==255,"Invalid encrypted key marker");verifyKey(java.nio.ByteBuffer.wrap(keyEvent).getInt(2),keyEvent[1]!=0);
             }
             else if(type==5){int buttons=input.readUnsignedByte(),x=input.readUnsignedShort(),y=input.readUnsignedShort();
-                require(x==11&&y==17,"Pointer coordinates changed");
-                if(verifyWheel){int[] expected={0,8,0,16,0,32,0,64,0};
-                    require(wheelIndex<expected.length&&buttons==expected[wheelIndex++],"Wheel press/release ordering changed");
-                    if(wheelIndex==expected.length)wheel.countDown();
-                }else require(buttons==0,"Pointer buttons changed");pointer.countDown();}
+                if(verifyWheel&&wheelIndex==9){
+                    require(y==17&&x>=11&&x<=20,"Drag coordinates changed");
+                    if(!dragStarted){require(buttons==1&&x==11,"Drag press missing");dragStarted=true;}
+                    else if(buttons==0){require(x==20,"Drag release position changed");drag.countDown();}
+                    else require(buttons==1,"Drag button was released during movement");
+                }else{
+                    require(x==11&&y==17,"Pointer coordinates changed");
+                    if(verifyWheel){int[] expected={0,8,0,16,0,32,0,64,0};
+                        require(wheelIndex<expected.length&&buttons==expected[wheelIndex++],"Wheel press/release ordering changed");
+                        if(wheelIndex==expected.length)wheel.countDown();
+                    }else require(buttons==0,"Pointer buttons changed");pointer.countDown();
+                }}
             else throw new IllegalStateException("Unexpected client message "+type);
         }
     }

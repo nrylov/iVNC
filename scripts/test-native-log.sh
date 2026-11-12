@@ -23,3 +23,6 @@ java -cp "$OUT" dev.ivnc.nativeclient.AppleTunnelTest
 javac -d "$OUT" "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativeclient/NativeKeyboard.java" \
   "$PROJECT_ROOT/android/native-app/tests/NativeKeyboardTest.java"
 java -cp "$OUT" dev.ivnc.nativeclient.NativeKeyboardTest
+
+javac -cp "$OUT" -d "$OUT" "$PROJECT_ROOT/android/native-app/tests/NativeDragTest.java"
+java -cp "$OUT" dev.ivnc.nativeclient.NativeDragTest

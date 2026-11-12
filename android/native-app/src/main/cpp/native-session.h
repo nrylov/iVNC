@@ -27,8 +27,9 @@ struct NativeSession {
     bool frameDirty=false;
     std::atomic<int> socket{-1};
     std::mutex inputMutex;
-    struct Pointer {int x,y,buttons;std::vector<int32_t> keys;};
+    struct Pointer {int x,y,buttons;std::vector<int32_t> keys;bool motion=false;};
     std::deque<Pointer> input;
+    int submittedButtons=0;
     long frames=0, metricsFrames=0;
     uint64_t metricsAt=0, handleCpuNs=0, handleWallNs=0, renderWallNs=0, socketWaitNs=0;
     int authenticationResult=-1;

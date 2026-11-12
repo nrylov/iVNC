@@ -45,7 +45,10 @@ public final class CursorInstrumentation extends Instrumentation {
                     visible++;require(x>=390&&x<550&&y>=290&&y<480,"Cursor hotspot mapping changed");
                     light|=(color&0xffffff)==0xfcfcfc;dark|=(color&0xffffff)==0x080c12;
                 }
-                bitmap.recycle();require(visible>50&&light&&dark,"Cursor arrow/outline were not drawn");
+                require(visible>50&&light&&dark,"Cursor arrow/outline were not drawn");
+                drawn.dragging(true);bitmap.eraseColor(0);drawn.draw(new Canvas(bitmap));boolean heldColor=false;
+                for(int y=290;y<480;y++)for(int x=390;x<550;x++)heldColor|=(bitmap.getPixel(x,y)&0xffffff)==0x80c9ff;
+                bitmap.recycle();require(heldColor,"Held-button cursor indicator was not drawn");
                 event.invoke(target,"status","Native connection ended");require(overlay.getVisibility()!=View.VISIBLE,"Disconnected cursor remains visible");
             }catch(Throwable error){failure.set(error);}});
             if(failure.get()!=null)throw new IllegalStateException(failure.get());

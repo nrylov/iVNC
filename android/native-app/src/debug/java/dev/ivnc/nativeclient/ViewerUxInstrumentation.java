@@ -58,6 +58,12 @@ public final class ViewerUxInstrumentation extends Instrumentation {
                 near(viewport.zoom(),2.1f);
                 send(target,touch,texture,MotionEvent.ACTION_POINTER_UP|(1<<8),new float[]{100,700},new float[]{400,400});
                 send(target,touch,texture,MotionEvent.ACTION_UP,new float[]{100},new float[]{400});
+                NativeTrackpad trackpad=(NativeTrackpad)field(target,"trackpad");action.invoke(target,"drag-lock");
+                send(target,touch,texture,MotionEvent.ACTION_DOWN,new float[]{200},new float[]{400});
+                send(target,touch,texture,MotionEvent.ACTION_MOVE,new float[]{250},new float[]{400});
+                send(target,touch,texture,MotionEvent.ACTION_UP,new float[]{250},new float[]{400});
+                require(trackpad.buttons()==1&&trackpad.dragLocked(),"Viewer gesture released drag lock on finger lift");
+                action.invoke(target,"drag-lock");require(trackpad.buttons()==0,"Viewer drag-lock action did not release");
                 Matrix matrix=texture.getTransform(null);RectF mapped=new RectF(0,0,texture.getWidth(),texture.getHeight());matrix.mapRect(mapped);
                 near(mapped.left,viewport.left());near(mapped.top,viewport.top());near(mapped.width(),viewport.imageWidth());near(mapped.height(),viewport.imageHeight());
                 require(target.findViewById(android.R.id.content).findViewWithTag("native-status").getVisibility()==View.GONE,"Connected toolbar still covers desktop");

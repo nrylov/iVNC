@@ -183,7 +183,21 @@ sessions protect key events with the full tunnel; compatibility sessions use
 Apple's per-key encrypted records. IME commits are bounded to 240 code points.
 Keyboard input is never added to the debug log.
 
-Host tests and real Galaxy synthetic IME/protected-protocol tests pass; actual
-Mac typing is awaiting owner confirmation. Owner has confirmed 0.12 enhanced
+Host tests and real Galaxy synthetic IME/protected-protocol tests pass; the owner confirms native
+keyboard typing and buttons work well. Owner has confirmed 0.12 enhanced
 Standard is much smoother, with mostly 80–140 posted updates/sec in their log.
 Those counts are not physical display FPS. Native HP media remains pending.
+
+
+## Dragging and selecting text (0.14)
+
+- **Tap-drag:** double-tap with one finger, keep it down on the second tap, then
+  slide. Lift to release the mouse button.
+- **Long selections:** position the pointer at the start, enable **⋮ → Drag lock**,
+  then slide one finger. Lift and reposition your finger as needed; the button
+  remains held. Turn **Drag lock** off to finish.
+
+The cursor turns blue while the left button is held. Zoomed pointer-follow panning
+works during dragging. Opening keyboard/connection controls or starting a two-
+finger gesture cancels dragging safely. Host gesture tests and Galaxy native
+protocol/viewer/cursor tests pass; actual Mac text selection awaits owner feedback.

@@ -8,6 +8,7 @@ import java.util.Map;
 final class NativeTrackpad {
     interface Output {
         void move(float dx,float dy); void click(int button); void wheel(int mask);
+        default void hold(boolean down){}
         default void zoom(float factor,float x,float y,float dx,float dy){}
     }
     private enum Mode { PENDING,SCROLL,PINCH }
@@ -21,14 +22,31 @@ final class NativeTrackpad {
     private int maximum;
     private long started;
     private Mode mode=Mode.PENDING;
+    private boolean dragLocked,tapDragging,suppressTap;
+    private long lastTap=Long.MIN_VALUE;
+    private float lastTapX,lastTapY,downX,downY;
+    int buttons(){return dragLocked||tapDragging?1:0;}
+    boolean dragLocked(){return dragLocked;}
+    /** Holds the left button across finger lifts, for long selections with pointer-follow panning. */
+    void setDragLocked(boolean value){
+        boolean held=buttons()!=0;dragLocked=value;tapDragging=false;lastTap=Long.MIN_VALUE;
+        if(held!=(buttons()!=0))output.hold(buttons()!=0);
+    }
     NativeTrackpad(float density,Output output){
         this.density=density;this.output=output;tapSlop=10*density;baseScrollStep=24*density;setScrollSpeed(DEFAULT_SCROLL_SPEED);
     }
     /** Changes wheel sensitivity independently of pointer speed and desktop zoom. */
     void setScrollSpeed(int multiplier){scrollStep=baseScrollStep/Math.max(1,Math.min(24,multiplier));scrollX=scrollY=0;}
     void down(int id,float x,float y,long time){
-        if(contacts.isEmpty()){maximum=0;started=time;distance=scrollX=scrollY=0;mode=Mode.PENDING;}
+        if(contacts.isEmpty()){
+            maximum=0;started=time;distance=scrollX=scrollY=0;mode=Mode.PENDING;suppressTap=false;downX=x;downY=y;
+            if(!dragLocked&&lastTap!=Long.MIN_VALUE&&time>=lastTap&&time-lastTap<=300&&Math.hypot(x-lastTapX,y-lastTapY)<=24*density){
+                tapDragging=true;output.hold(true);
+            }
+            lastTap=Long.MIN_VALUE;
+        }
         contacts.put(id,new float[]{x,y});maximum=Math.max(maximum,contacts.size());
+        if(contacts.size()>1&&buttons()!=0){setDragLocked(false);suppressTap=true;}
         if(contacts.size()==2){
             float[] geometry=geometry();originX=lastX=geometry[0];originY=lastY=geometry[1];originSpan=lastSpan=geometry[2];
         }
@@ -65,8 +83,12 @@ final class NativeTrackpad {
     }
     void up(int id,long time){
         if(contacts.remove(id)==null||!contacts.isEmpty())return;
-        if(maximum<=2&&mode==Mode.PENDING&&time-started<350&&distance<=tapSlop)output.click(maximum==2?4:1);
+        if(tapDragging){tapDragging=false;output.hold(false);}
+        else if(!dragLocked&&!suppressTap&&maximum<=2&&mode==Mode.PENDING&&time-started<350&&distance<=tapSlop){
+            output.click(maximum==2?4:1);
+            if(maximum==1){lastTap=time;lastTapX=downX;lastTapY=downY;}
+        }
         maximum=0;
     }
-    void cancel(){contacts.clear();maximum=0;scrollX=scrollY=0;}
+    void cancel(){contacts.clear();maximum=0;scrollX=scrollY=0;suppressTap=true;setDragLocked(false);}
 }
