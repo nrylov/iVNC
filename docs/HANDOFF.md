@@ -1,3 +1,16 @@
+# Native scroll default tuned to 12x — 2026-11-11
+
+Owner says 0.8 scrolling is better but wants it a little faster. Native 0.9 raises
+the default from 8x to 12x (2dp/tick), 50% more wheel output for a normal swipe.
+Saved custom slider values remain respected; range remains 1x–24x. No protocol,
+queue, pointer or gesture-lifecycle changes. Host regression updated to verify
+24 ticks for a 48dp swipe at the new default (versus 16 previously).
+
+Project-local build and host input/log tests PASS. Installed 0.9 on paired Galaxy
+and opened it for owner test. No repeated device protocol tests for this constant
+change; prior 0.8 device protocol/UI checks remain the baseline. Actual Mac feel
+at 12x awaits owner feedback. Release remains ON HOLD; continue native work.
+
 # Native scroll sensitivity — 2026-11-11
 
 Owner confirms native scrolling works on the Mac with Pipeline on and off, but

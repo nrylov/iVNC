@@ -12,8 +12,8 @@ final class NativeTrackpad {
     private final Map<Integer,float[]> contacts=new LinkedHashMap<>();
     private final Output output;
     // The initial 24dp/notch mapping was impractically slow on the owner's Mac.
-    // Keep it as the 1x baseline, with an adjustable 8x default.
-    static final int DEFAULT_SCROLL_SPEED=8;
+    // Keep it as the 1x baseline, with an adjustable 12x default.
+    static final int DEFAULT_SCROLL_SPEED=12;
     private static final int MAX_STEPS_PER_MOVE=16;
     private final float tapSlop,baseScrollStep;
     private float scrollStep;

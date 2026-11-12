@@ -28,7 +28,7 @@ public final class NativeTrackpadTest {
         require(actions.isEmpty(),"Three-finger gesture emitted input");
         pad.down(1,0,0,0);pad.cancel();pad.move(1,100,100);pad.up(1,50);require(actions.isEmpty(),"Cancelled gesture emitted input");
         actions.clear();pad.setScrollSpeed(NativeTrackpad.DEFAULT_SCROLL_SPEED);scroll(0,48);
-        require(actions.size()==16&&actions.stream().allMatch("wheel:8"::equals),"Default swipe should scroll eight times farther than 1x");
+        require(actions.size()==24&&actions.stream().allMatch("wheel:8"::equals),"Default swipe should scroll twelve times farther than 1x");
         actions.clear();pad.setScrollSpeed(24);scroll(0,10000);
         require(actions.size()<=32,"Large input generated an unbounded wheel burst");
         actions.clear();pad.setScrollSpeed(8);pad.down(1,0,0,0);pad.down(2,50,0,1);

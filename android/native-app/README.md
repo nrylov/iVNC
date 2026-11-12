@@ -120,3 +120,6 @@ than 24dp). Use the **Scroll** button to adjust it from 1× to 24×. The setting
 saved locally and restored on the next launch; pointer speed is independent.
 Large event bursts remain bounded and two-finger tap slop is unchanged. Actual
 Mac feel at the new default is awaiting owner feedback.
+
+0.9 raises the default to **12×** (2dp per wheel tick), 50% faster than 0.8,
+after owner feedback. An explicitly saved slider value remains in effect.
