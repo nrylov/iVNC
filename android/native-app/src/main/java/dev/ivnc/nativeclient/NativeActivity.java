@@ -239,7 +239,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture value){offline();connection.surface(null);surface=null;return true;}
     @Override public void onSurfaceTextureSizeChanged(SurfaceTexture value,int width,int height){fit();}
     @Override public void onSurfaceTextureUpdated(SurfaceTexture value){}
-    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)ViewerControls.immersive(this);if(clipboard!=null)clipboard.focus(focused&&resumed);}
+    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)ViewerControls.immersive(this);else if(keyboardDock!=null)keyboardDock.stopRepeating();if(clipboard!=null)clipboard.focus(focused&&resumed);}
     @Override protected void onResume(){super.onResume();resumed=true;clipboard.focus(hasWindowFocus());connection.foreground(true);}
     @Override protected void onPause(){resumed=false;clipboard.focus(false);offline();connection.foreground(false);super.onPause();}
     @Override protected void onDestroy(){connection.close();saved.close();super.onDestroy();}

@@ -1,3 +1,24 @@
+# Native 0.19 held accessory arrows — 2026-11-12
+
+Owner confirms native HP works well, then requests repeating arrow buttons.
+Implemented 0.19-native-arrow-repeat and installed. KeyRepeater is a pure
+clock-driven model: immediate pulse,400ms initial delay,45ms interval, no catch-up
+bursts. RepeatingKeys adapts real touch to it, cancelling on release/slide-off,
+cancel, focus loss, hide/clear/detach or input rejection. Accessible click path
+retains single-press behavior. NativeKeyboard.RepeatedKey snapshots one-shot
+modifiers for the complete held gesture and emits balanced atomic batches per
+pulse, avoiding stuck remote keys even when interrupted. Standard and HP share it.
+
+Host key model/timing/gesture/cipher regressions PASS; native build PASS. Galaxy
+ArrowRepeatInstrumentation PASS: actual held-arrow MotionEvents/timer, retained
+modifiers and balanced releases, quick tap no duplicate, stop on release/slide-off/
+cancel/focus loss/hide. KeyboardInstrumentation PASS for IME/composition/shortcuts
+and layout. Test selects arrows inside its active fake dock, not the hidden
+production dock with duplicate tags. No owner text/clipboard read by tests.
+APK0.19 installed, source and evidence pushed. Owner real-Mac HP confirmation
+remains valid for unchanged0.18 protocol/media path. Next obtain normal user feel
+feedback; iOS remains deferred and no GitHub APK release was created.
+
 # Native 0.18 High Performance works on owner Mac — 2026-11-12
 
 Owner requested native HP now and explicitly deferred iOS. Implemented HP and

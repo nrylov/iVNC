@@ -24,8 +24,9 @@ final class KeyboardDock {
     private final Consumer<Integer> reserved;
     private final Map<Integer,Button> modifiers=new HashMap<>();
     private int imeBottom;
+    private final RepeatingKeys repeating;
     KeyboardDock(Activity activity,FrameLayout root,NativeKeyboard keyboard,Consumer<Integer> reserved){
-        this.activity=activity;this.root=root;this.keyboard=keyboard;this.reserved=reserved;
+        this.activity=activity;this.root=root;this.keyboard=keyboard;this.reserved=reserved;repeating=new RepeatingKeys(keyboard,this::result);
         panel=new LinearLayout(activity);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xf0152233);panel.setTag("native-keyboard-dock");panel.setVisibility(View.GONE);
         FrameLayout.LayoutParams layout=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);root.addView(panel,layout);
         LinearLayout keys=row();
@@ -50,7 +51,7 @@ final class KeyboardDock {
         HorizontalScrollView scroll=new HorizontalScrollView(activity);scroll.setHorizontalScrollBarEnabled(false);panel.addView(scroll);
         LinearLayout row=new LinearLayout(activity);scroll.addView(row);return row;
     }
-    private void key(LinearLayout row,String label,int symbol){Button button=button(row,label);button.setOnClickListener(view->result(keyboard.press(symbol)));}
+    private void key(LinearLayout row,String label,int symbol){Button button=button(row,label);button.setOnClickListener(view->result(keyboard.press(symbol)));if(symbol>=0xff51&&symbol<=0xff54)repeating.attach(button,symbol);}
     private Button button(LinearLayout row,String label){Button button=new Button(activity);button.setText(label);button.setTextSize(12);button.setMinWidth(0);button.setMinimumWidth((int)(44*activity.getResources().getDisplayMetrics().density));button.setPadding(18,0,18,0);row.addView(button);return button;}
     private void modifier(LinearLayout row,String label,int symbol){Button button=button(row,label);modifiers.put(symbol,button);button.setOnClickListener(view->{keyboard.toggle(symbol);refresh();});}
     private boolean result(boolean accepted){
@@ -68,6 +69,7 @@ final class KeyboardDock {
             activity.getSystemService(InputMethodManager.class).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);
         }else if(retries>0)input.postDelayed(()->showIme(retries-1),50);
     }
-    void hide(){keyboard.clear();input.getText().clear();refresh();panel.setVisibility(View.GONE);activity.getSystemService(InputMethodManager.class).hideSoftInputFromWindow(input.getWindowToken(),0);reserved.accept(0);root.requestFocus();}
-    void clear(){keyboard.clear();input.getText().clear();refresh();}
+    void stopRepeating(){repeating.stop();}
+    void hide(){repeating.stop();keyboard.clear();input.getText().clear();refresh();panel.setVisibility(View.GONE);activity.getSystemService(InputMethodManager.class).hideSoftInputFromWindow(input.getWindowToken(),0);reserved.accept(0);root.requestFocus();}
+    void clear(){repeating.stop();keyboard.clear();input.getText().clear();refresh();}
 }

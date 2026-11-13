@@ -259,3 +259,17 @@ including reordered/wrapped packets, exact RGBA, an active-stream interruption a
 a fresh session afterward. Owner confirms actual Mac 0.18 streaming works well; live FPS is not measured.
 FFmpeg is a separate LGPL shared-library dependency; source and build recipe are
 in `third_party/ffmpeg` and `scripts/build-video.sh`.
+
+
+## Hold arrow keys to repeat (0.19)
+
+Press and hold an accessory arrow for continuous input. The first arrow is sent
+immediately; after 400ms it repeats every 45ms until release. Sliding off, touch
+cancellation, changing focus, hiding the keyboard or leaving the app stops repeat.
+A quick tap sends exactly one arrow.
+
+Modifiers selected before the hold apply to the entire gesture (for example,
+Shift+Left keeps extending a selection). Every pulse contains matching key and
+modifier releases, so interruption cannot leave a key held on the Mac. Failed or
+backpressured input stops repeat, and a delayed UI thread does not send catch-up
+bursts. Accessibility clicks still send a single arrow normally.

@@ -26,13 +26,24 @@ final class NativeKeyboard {
         }).filter(value->value!=0).toArray();
         return send(symbols);
     }
+    /** Captures one-shot modifiers for an entire held-arrow gesture, with no remotely stuck keys. */
+    RepeatedKey repeated(int symbol){return new RepeatedKey(symbol);}
+    final class RepeatedKey {
+        private final Set<Integer> selected=new LinkedHashSet<>(modifiers);
+        private final int[] events;private boolean started;
+        private RepeatedKey(int symbol){events=batch(new int[]{symbol},selected);}
+        boolean press(){if(!output.send(events.clone()))return false;if(!started){modifiers.removeAll(selected);started=true;}return true;}
+    }
     private boolean send(int[] symbols){
         if(symbols.length>240)return false;
-        ArrayList<Integer> events=new ArrayList<>();for(int modifier:modifiers)events.add(modifier);
+        int[] events=batch(symbols,modifiers);
+        if(events.length==0)return true;
+        if(!output.send(events))return false;clear();return true;
+    }
+    private static int[] batch(int[] symbols,Set<Integer> selected){
+        ArrayList<Integer> events=new ArrayList<>();for(int modifier:selected)events.add(modifier);
         for(int symbol:symbols){events.add(symbol);events.add(-symbol);}
-        ArrayList<Integer> reverse=new ArrayList<>(modifiers);for(int i=reverse.size()-1;i>=0;i--)events.add(-reverse.get(i));
-        if(events.isEmpty())return true;
-        if(!output.send(events.stream().mapToInt(Integer::intValue).toArray()))return false;
-        clear();return true;
+        ArrayList<Integer> reverse=new ArrayList<>(selected);for(int i=reverse.size()-1;i>=0;i--)events.add(-reverse.get(i));
+        return events.stream().mapToInt(Integer::intValue).toArray();
     }
 }

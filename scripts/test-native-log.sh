@@ -36,3 +36,6 @@ java -cp "$OUT:$ANDROID_STUBS" dev.ivnc.nativeclient.ClipboardSyncTest
 
 javac -cp "$OUT" -d "$OUT" "$PROJECT_ROOT/android/native-app/tests/NativeTouchTest.java"
 java -cp "$OUT" dev.ivnc.nativeclient.NativeTouchTest
+
+javac -cp "$OUT" -d "$OUT" "$PROJECT_ROOT/android/native-app/src/main/java/dev/ivnc/nativeclient/KeyRepeater.java" "$PROJECT_ROOT/android/native-app/tests/KeyRepeaterTest.java"
+java -cp "$OUT" dev.ivnc.nativeclient.KeyRepeaterTest
