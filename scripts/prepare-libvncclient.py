@@ -10,6 +10,18 @@ OUTPUT=ROOT/'.dev/libvncclient-source'
 REVISION='98aaee0560baa0332339b2ef464ea96ed9b9b28c'
 PATCH='socket-idle-rsa33-apple-session-v6'
 identity=REVISION+' '+PATCH
+# Complete release source bundles have no .git metadata. They include the exact
+# prepared client source and identity so rebuilding does not require a Git clone.
+ARCHIVED=ROOT/'prepared/libvncclient'
+if not (SOURCE/'.git').exists() and ARCHIVED.exists():
+    if (ARCHIVED/'.ivnc-patch').read_text()!=identity:
+        raise SystemExit('Prepared release source identity differs from the reviewed pin')
+    archived_marker=OUTPUT/'.ivnc-patch'
+    if not archived_marker.exists() or archived_marker.read_text()!=identity:
+        if OUTPUT.exists(): shutil.rmtree(OUTPUT)
+        OUTPUT.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copytree(ARCHIVED,OUTPUT)
+    raise SystemExit(0)
 if subprocess.check_output(['git','-C',str(SOURCE),'rev-parse','HEAD'],text=True).strip()!=REVISION:
     raise SystemExit('LibVNCClient revision differs from the reviewed pin')
 marker=OUTPUT/'.ivnc-patch'
