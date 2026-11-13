@@ -18,7 +18,21 @@ def git(*args, cwd=ROOT):
 def extract(source, destination):
     """Extract only trusted local Git archives into an isolated packaging directory."""
     with tarfile.open(fileobj=io.BytesIO(source)) as archive:
-        archive.extractall(destination, filter='data')
+        root = destination.resolve()
+        for member in archive.getmembers():
+            target = (root/member.name).resolve()
+            if root != target and root not in target.parents:
+                raise ValueError('Archive path leaves source directory')
+            if member.isdev():
+                raise ValueError('Device entries are not source files')
+            if member.issym() or member.islnk():
+                base = target.parent if member.issym() else root
+                link = (base/member.linkname).resolve()
+                if root != link and root not in link.parents:
+                    raise ValueError('Archive link leaves source directory')
+        # These archives come from local Git commits. Validate paths explicitly
+        # for Python versions predating tarfile's extraction-filter API.
+        archive.extractall(destination)
 
 def main():
     """Publishable artifacts contain no signing key; source includes exact prepared client code."""
