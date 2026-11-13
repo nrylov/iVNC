@@ -11,4 +11,5 @@
     <instrumentation android:name=".ProfileStoreInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Encrypted native saved profile regression" />
     <instrumentation android:name=".SessionFeaturesInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Initial refresh and clipboard regression" />
     <instrumentation android:name=".SavedSessionInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Saved session and lifecycle regression" />
+    <instrumentation android:name=".HighPerformanceInstrumentation" android:targetPackage="dev.ivnc.nativeclient" android:label="Native HP media regression" />
 </manifest>

@@ -38,7 +38,7 @@ rfbBool allocate(rfbClient* client){
     return client->frameBuffer?TRUE:FALSE;
 }
 void updated(rfbClient* client,int,int,int width,int height){if(width>0&&height>0)owner(client)->frameDirty=true;}
-void finished(rfbClient* client){auto* session=owner(client);if(!finishAppleEncryption(session)||!finishAppleDisplay(session)){session->emit("error","Apple encryption transition failed");session->running=false;return;}if(session->frameDirty){session->present();session->frameDirty=false;}}
+void finished(rfbClient* client){auto* session=owner(client);if(!finishAppleEncryption(session)||!finishAppleDisplay(session)){session->emit("error","Apple encryption transition failed");session->running=false;return;}if(session->frameDirty){if(!session->highPerformanceRequested)session->present();session->frameDirty=false;}}
 rfbBool cursorPosition(rfbClient* client,int x,int y){
     char position[64];snprintf(position,sizeof(position),"%d,%d",x,y);owner(client)->emit("cursor",position);return TRUE;
 }
@@ -77,7 +77,7 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
     if(!rfbClientConnect(client)){emit("error","Native TCP connection failed");}
     else {
         socket=client->sock;
-        if(!running||!rfbClientInitialise(client)) {
+        if(!running||!startHighPerformance(this,surface)||!rfbClientInitialise(client)) {
             if(running && !publicKeyProbed) {
                 char message[192];
                 if(authenticationResult>0)snprintf(message,sizeof(message),"Mac rejected authentication (status %d)",authenticationResult);
@@ -101,6 +101,7 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
                         int buttons=appleProtocol?(p.buttons&~6)|((p.buttons&4)>>1)|((p.buttons&2)<<1):p.buttons;
                         if(!SendPointerEvent(client,p.x,p.y,buttons)){running=false;break;}
                     }}
+                if(!pollHighPerformance(this))break;
                 bool refresh=refreshRequested.exchange(false);
                 if(refreshRetryAtMs&&clockNs(CLOCK_MONOTONIC)/1000000>=refreshRetryAtMs){refreshRetryAtMs=0;refresh=true;}
                 if(refresh&&!refreshDesktop(this,false)){emit("error","Desktop refresh request failed");break;}
@@ -119,6 +120,7 @@ void NativeSession::run(JNIEnv* current,const char* host,int port,jstring user,j
             }
         }
     }
+    closeHighPerformance(this);
     env->CallVoidMethod(tunnel,env->GetMethodID(tunnelClass,"close","()V"));
     std::fill(clipboardOutgoing.begin(),clipboardOutgoing.end(),0);clipboardOutgoing.clear();
     std::fill(decrypted.begin(),decrypted.end(),0);decrypted.clear();decryptedOffset=0;

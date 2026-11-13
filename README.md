@@ -5,8 +5,9 @@ Apple-specific authentication, encrypted control messages and clipboard support.
 
 The viewer includes full-screen touch and trackpad control, pinch zoom, pointer-follow
 panning, drag selection, an advanced keyboard, encrypted saved login and
-reconnection when returning from another app. Native High Performance media is
-still being implemented; current sessions use enhanced Apple Standard mode.
+reconnection when returning from another app. Choose enhanced Apple Standard mode
+or the native High Performance preview, which uses encrypted UDP media and HEVC
+decoding on a virtual display. High Performance audio is not implemented.
 
 ## Motivation
 
@@ -16,8 +17,8 @@ such as zoom, direct touch and trackpad control. I couldn't find an app that
 combined those features in a way that worked for me, so I started building iVNC.
 
 The goal is a comfortable remote desktop that works with macOS built-in Screen
-Sharing. Clipboard, zoom and input controls are available today; native High
-Performance support is the next major milestone.
+Sharing. Clipboard, zoom and input controls are available today, alongside a native High
+Performance preview undergoing real-device and Mac validation.
 
 ## Build
 

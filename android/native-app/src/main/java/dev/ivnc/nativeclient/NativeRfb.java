@@ -12,6 +12,7 @@ final class NativeRfb {
     static native void stop(long handle);
     static native void destroy(long handle);
     static native void refresh(long handle);
+    static native void highPerformance(long handle,boolean enabled);
     static native void enhanced(long handle,boolean enabled);
     static native void encryption(long handle,boolean enabled);
     static native void pipeline(long handle,boolean enabled);

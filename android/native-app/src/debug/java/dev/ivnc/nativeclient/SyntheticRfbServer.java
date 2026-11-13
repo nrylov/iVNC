@@ -20,6 +20,7 @@ final class SyntheticRfbServer implements AutoCloseable {
     final CountDownLatch pointer=new CountDownLatch(1),wheel=new CountDownLatch(1),keyboard=new CountDownLatch(1),drag=new CountDownLatch(1);
     final SyntheticClipboardPeer clipboardPeer=new SyntheticClipboardPeer();
     final java.util.concurrent.atomic.AtomicInteger accepted=new java.util.concurrent.atomic.AtomicInteger(),logins=new java.util.concurrent.atomic.AtomicInteger(),fullRequests=new java.util.concurrent.atomic.AtomicInteger();
+    volatile SyntheticHpPeer hp;
     volatile boolean reconnect,partialUntilRefresh;
     private boolean fullBaseline;
     private boolean dragStarted;
@@ -77,12 +78,12 @@ final class SyntheticRfbServer implements AutoCloseable {
         output.writeShort(zeroGeometry?0:32);output.writeShort(zeroGeometry?0:32);
         output.write(new byte[]{32,24,0,1,0,(byte)255,0,(byte)255,0,(byte)255,0,8,16,0,0,0});
         byte[] name="Synthetic iVNC".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        if(enhanced){byte[] extended=new byte[name.length+22];extended[5]=4;System.arraycopy(name,0,extended,22,name.length);name=extended;}output.writeInt(name.length);output.write(name);output.flush();
+        if(enhanced){byte[] extended=new byte[name.length+22];extended[5]=4;if(hp!=null)extended[9]=12;System.arraycopy(name,0,extended,22,name.length);name=extended;}output.writeInt(name.length);output.write(name);output.flush();
         if(enhanced){
             ByteArrayOutputStream sessionBytes=new ByteArrayOutputStream();DataOutputStream session=new DataOutputStream(sessionBytes);
-            session.writeShort(1);session.writeInt(2);session.writeInt(0);session.writeBytes("synthetic-console");session.writeByte(0);
+            session.writeShort(1);session.writeInt(hp==null?2:6);session.writeInt(0);session.writeBytes("synthetic-console");session.writeByte(0);
             output.writeShort(sessionBytes.size());output.write(sessionBytes.toByteArray());output.flush();
-            byte[] selected=input.readNBytes(74);require(selected.length==74&&selected[1]==72&&selected[3]==1&&selected[8]==1,"Console Session Select command missing");
+            byte[] selected=input.readNBytes(74);require(selected.length==74&&selected[1]==72&&selected[3]==1&&selected[8]==(hp==null?1:2),"Console Session Select command missing");
             for(int status:new int[]{2,0}){output.writeShort(80);output.writeShort(1);output.writeInt(status);output.write(new byte[74]);}output.flush();
         }
         stage="ServerInit sent";int sent=0;
@@ -93,15 +94,17 @@ final class SyntheticRfbServer implements AutoCloseable {
             else if(type==10){require(enhanced&&java.util.Arrays.equals(input.readNBytes(3),new byte[]{0,0,1}),"SetMode changed");}
             else if(type==13){require(enhanced&&java.util.Arrays.equals(input.readNBytes(7),new byte[]{1,0,0,0,0,0,0}),"SetDisplay changed");}
             else if(type==9){require(enhanced,"Unexpected push subscription");byte[] subscription=input.readNBytes(15);require(subscription.length==15&&subscription[2]==1&&subscription[12]==32&&subscription[14]==32,"Push subscription region changed");}
+            else if(type==29){require(hp!=null,"Unexpected virtual display");input.readUnsignedByte();int length=input.readUnsignedShort();require(length==192&&input.readNBytes(length).length==192,"Virtual display request malformed");}
+            else if(type==28){require(hp!=null&&encryptionActive,"Unencrypted HP offer");hp.offer(input,output);}
             else if(type==0)input.readNBytes(19);
-            else if(type==2){input.readUnsignedByte();int count=input.readUnsignedShort();require(count<256,"Encoding count too large");input.readNBytes(count*4);}
+            else if(type==2){input.readUnsignedByte();int count=input.readUnsignedShort();require(count<256,"Encoding count too large");byte[] encodings=input.readNBytes(count*4);if(hp!=null)require(java.nio.ByteBuffer.wrap(encodings).getInt(0)==1010&&java.nio.ByteBuffer.wrap(encodings).getInt(encodings.length-4)==1110,"HP encoding ordering");}
             else if(type==18){
                 require(encrypted&&!encryptionActive,"Unexpected encryption request");
                 require(java.util.Arrays.equals(input.readNBytes(11),new byte[]{0,0,1,0,1,0,1,0,0,0,1}),"Encryption request malformed");
                 ByteArrayOutputStream first=new ByteArrayOutputStream();frame(input,new DataOutputStream(first));
                 SyntheticEncryptedChannel.Streams streams=encryptedPeer.activate(aes,input,output,first.toByteArray(),corruptRecord);
                 java.util.Arrays.fill(aes,(byte)0);input=streams.input;output=streams.output;encryptionActive=true;sent=1;
-                if(enhanced){frame(input,output);sent=2;}
+                if(enhanced){frame(input,output);sent=2;}if(hp!=null)hp.start(output);
             }
             else if(type==3){byte[] update=input.readNBytes(9);
                 if(encryptionActive&&update.length==9&&update[0]==0){fullBaseline=true;fullRequests.incrementAndGet();}

@@ -6,8 +6,8 @@ RSA type-33 login. The app packages a direct native renderer and its own Java Vi
 
 Package `dev.ivnc.nativeclient` provides Standard RFB rendering and relative
 mouse input, plus two-finger scrolling and two-finger tap to right-click. Encrypted Apple text clipboard, secure profile persistence and app-return
-reconnection are implemented in 0.15. Apple High Performance remains pending.
-High Performance implementation and owner validation are required before release.
+reconnection are implemented in 0.15. Apple High Performance is available as a native preview in 0.18.
+Owner validation is required before release.
 
 Build using existing project-local tools:
 
@@ -233,3 +233,29 @@ to drag/select. Coordinates follow the current zoom and pan. Letterbox taps are
 ignored and dragging past an image edge clamps to that edge. Pointer-follow
 panning stays off in touch mode to keep targets under your finger. Two-finger
 scrolling, two-finger right-click and pinch zoom remain available in both modes.
+
+
+## Native High Performance preview (0.18)
+
+Enable **High Performance (virtual display)** in Connection and connect. This
+requires an Apple-capable enhanced session; Compatibility mode and HP are mutually
+exclusive. The choice is included in the encrypted remembered connection. Uncheck
+HP to return to Standard with the same saved login.
+
+The client requests a 1920×1080 virtual display, sends media offers only after TCP
+encryption activates, then receives authenticated SRTP directly into Java crypto
+and a bounded HEVC packet assembler. C++ FFmpeg decodes dependent stripes in order
+and coalesces Surface presentation. There is no JavaScript/base64 media bridge.
+Sound is not implemented; the audio channel is received/authenticated for protocol
+feedback. RTCP reports, rate control and picture ACKs keep the stream advancing.
+
+Lost/stalled pictures cause bounded media re-offers. App pause closes the complete
+media lifetime; normal reconnect recreates it. Queues and packet/geometry limits
+are bounded. Replay/tamper rejection is enabled. Debug logs contain counters and
+states, never media keys, offers, packet contents or screen images.
+
+Host independent reference vectors and Galaxy synthetic full-path tests pass,
+including reordered/wrapped packets, exact RGBA, an active-stream interruption and
+a fresh session afterward. Owner confirms actual Mac 0.18 streaming works well; live FPS is not measured.
+FFmpeg is a separate LGPL shared-library dependency; source and build recipe are
+in `third_party/ffmpeg` and `scripts/build-video.sh`.

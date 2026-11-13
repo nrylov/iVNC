@@ -41,6 +41,7 @@ bool finishAppleDisplay(NativeSession* s){
 
 bool refreshDesktop(NativeSession* s,bool retry){
     if(s->awaitingGeometry)return true;
+    if(s->highPerformanceRequested)return appleAutoUpdate(s);
     if(!SendFramebufferUpdateRequest(s->client,0,0,s->client->width,s->client->height,FALSE))return false;
     if(s->appleProtocol&&!appleAutoUpdate(s))return false;
     if(retry)s->refreshRetryAtMs=std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()+50;

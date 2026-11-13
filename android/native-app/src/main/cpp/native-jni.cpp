@@ -80,3 +80,5 @@ extern "C" JNIEXPORT jboolean JNICALL Java_dev_ivnc_nativeclient_NativeRfb_clipb
     for(auto& queued:s->input)if(queued.clipboardAction==action){queued.clipboard=std::move(command.clipboard);return JNI_TRUE;}
     if(!s->running||s->input.size()>=254)return JNI_FALSE;s->input.push_back(std::move(command));return JNI_TRUE;
 }
+
+extern "C" JNIEXPORT void JNICALL Java_dev_ivnc_nativeclient_NativeRfb_highPerformance(JNIEnv*,jclass,jlong handle,jboolean enabled){reinterpret_cast<NativeSession*>(handle)->highPerformanceRequested=enabled;}

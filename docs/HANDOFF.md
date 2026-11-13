@@ -1,3 +1,47 @@
+# Native 0.18 High Performance works on owner Mac — 2026-11-12
+
+Owner requested native HP now and explicitly deferred iOS. Implemented HP and
+installed 0.18-native-high-performance. Owner live test: "it works well". Next
+steering: make accessory arrow keys repeat while held, like a physical keyboard.
+
+HP path: virtual Session Select command 2; capability gate bitmap byte 3 bits0x0c;
+1920×1080@1 virtual display before SetEncodings; 1010 first / 1110 last. Native C++
+forwards bounded negotiation metadata to Java; media offers only leave TCP after
+control encryption activates. Java HpOffer/HpPlist/HpWire implement binary plist,
+protobuf, zlib and fresh per-session secrets. HpSrtp implements AES-256-CM / HMAC
+SHA1-80 with authenticated rollover/replay rejection. Direct UDP5900/5901 accepts
+only TCP peer address and bounded packets; advertised server ports carry feedback.
+HpVideo assembles single/AP/FU HEVC packets in DON order with wrap/reorder/duplicate
+handling, bounded memory and key-picture resync. Three media recoveries per30sec.
+
+Restored owned C++ VideoDecoder and JNI under native-app. FFmpeg9 shared LGPL
+avutil/avcodec/swscale are built by scripts/build-video.sh; source+digest+notice
+under third_party/ffmpeg. No browser/runtime/base64 media path. Serial worker
+keeps all dependent stripes and coalesces Surface posts; partial stripe updates
+retain unchanged pixels. RTCP receiver reports, rate control and picture ACKs.
+Audio is authenticated/discarded (no playback). Background closes media; saved
+profile includes HP selection and reconnect recreates full lifetime. Standard is
+still default/unchecked fallback; Compatibility/HP mutually exclusive. If a Mac
+rejects HP, select Standard; permanent HP failure disables automatic return.
+
+Validation:
+- Build PASS, scripts/test-hp.sh independent archived reference vectors PASS for
+  exact audio/video offers, binary plist answer, SRTP/SRTCP, tamper/replay/rollover,
+  bounds and HEVC single/AP/FU ordering. scripts/test-native-log.sh regressions PASS.
+- Galaxy HighPerformanceInstrumentation PASS: full encrypted synthetic TCP setup,
+  virtual request/session/encoding ordering, authenticated reordered/wrapped UDP,
+  verified RTCP ACKs, exact reference RGBA; interruption while actively streaming
+  followed by another successful session proves media ports/workers released.
+- Galaxy Standard SessionFeaturesInstrumentation PASS (clipboard/refresh), saved
+  lifecycle/reconnect PASS, Keystore/profile including HP field/legacy default PASS,
+  viewer/touch/zoom/render guard PASS. Locked-phone attempts failed as expected;
+  after owner unlocked, relevant tests passed. No owner credentials or screen used.
+- Owner confirms actual Mac HP works well. No measured live FPS claim yet.
+
+Source is in /Users/nikolairylov/Repositories/iVNC, not newserver. iOS deferred.
+Release remains held. Next implement owner's hold-to-repeat arrow request, validate
+on synthetic keyboard, install and push. Keep logs metadata-only and tests isolated.
+
 # Native 0.17 touch mode and project motivation — 2026-11-12
 
 Owner requests README motivation plus restored touch input with trackpad default

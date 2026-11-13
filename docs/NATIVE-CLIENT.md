@@ -22,20 +22,28 @@ oversized clipboard data is skipped within bounded framing limits. Actual Mac
 confirmation of 0.16 remains pending. The owner confirmed prior native login,
 keyboard, zoom, dragging and smoother enhanced Standard mode.
 
-## High Performance work remaining
+## High Performance preview (0.18)
 
-1. Extend enhanced console setup to HP virtual-session offer/answer negotiation.
-2. Add native UDP/SRTP media receive, authentication/decryption, bounded stripe
-   assembly and RTCP feedback; verify loss, reordering and sequence wraparound.
-3. Reuse the prior native HEVC stripe decoder/compositor through direct buffers
-   and the existing viewport/cursor geometry. Restore focused replay fixtures.
-4. Verify actual Mac streaming, stalled sessions and Surface/background recovery.
-   Preserve working Standard fallback.
+The native app now implements virtual-session setup, HP offer/answer negotiation,
+UDP/SRTP receive, authenticated RTCP feedback and bounded DON-ordered HEVC stripe
+assembly. Java handles sockets/crypto without a browser bridge; the restored C++
+FFmpeg decoder composites directly to the viewer Surface. Presentation is coalesced
+while dependent packets are decoded in order. Initial virtual resolution is
+1920×1080; audio playback and dynamic resolution controls are future work.
 
-The earlier implementation and evidence remain on the reference branch linked in
-[provenance](PROVENANCE.md). A prior log reported mostly 80–140 Standard Surface
-posts per second; these are update counts, not physical display FPS. High
-Performance was verified in the archived client, not yet in the native app.
+The Connection checkbox selects HP and is saved inside the encrypted profile.
+Standard remains the default/fallback selection. Stalls trigger bounded re-offers;
+backgrounding closes the stream and normal app-return reconnect recreates it.
 
-See [handoff](HANDOFF.md) and `native-client-galaxy-s26.json` for validation.
-APK release remains on hold pending owner evaluation.
+Host tests compare offers, answer parsing and SRTP/SRTCP against independently
+generated archived vectors. Galaxy full-path tests pass exact synthetic pixels,
+reordered/wrapped UDP, authenticated feedback, active interruption and restart.
+Standard clipboard/refresh, saved sessions and secure storage regressions are
+checked separately. Owner confirms actual Mac 0.18 High Performance works well; no live FPS measurement yet.
+
+The earlier implementation remains on the reference branch linked in
+[provenance](PROVENANCE.md). Source for the reused LGPL FFmpeg libraries is restored
+in `third_party/ffmpeg`; protocol ports retain their archived origin comments.
+
+Next: validate live Mac HP, tune measured bottlenecks, then consider audio/dynamic
+resolution. iOS is explicitly deferred by owner. APK release remains on hold.

@@ -4,7 +4,7 @@
 
 Enable **Remember connection securely** and connect. After the first displayed
 frame, the native app saves one connection including password, enhanced /
-compatibility mode and pipeline preference. It uses its own app-scoped Keystore
+compatibility mode, High Performance selection and pipeline preference. It uses its own app-scoped Keystore
 key and encrypted preferences, independent of the archived client. Saved passwords
 appear as a hint and are never inserted into a password text field.
 

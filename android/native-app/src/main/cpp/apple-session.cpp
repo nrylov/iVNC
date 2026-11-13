@@ -24,11 +24,12 @@ extern "C" int ivncAppleServerInit(rfbClient* c){
     auto* bytes=reinterpret_cast<uint8_t*>(c->desktopName);size_t length=c->si.nameLength;
     if(length<22||bytes[0]!=0){s->emit("error","Enhanced Apple ServerInit metadata missing");return 0;}
     uint32_t flags=u32(bytes+2);s->emit("status","Apple enhanced ServerInit received");
+    if(s->highPerformanceRequested&&(bytes[9]&0x0c)!=0x0c){s->emit("error","Mac does not advertise High Performance; select Standard");return 0;}
     if(!(flags&4))return 1;
     std::vector<uint8_t> info;if(!readBlock(c,info)||info.size()<10)return 0;
     uint32_t allowed=u32(info.data()+2);bool hasUser=info.size()>10&&info[10]!=0;
-    unsigned command=!hasUser&&!(allowed&2)?0:1;
-    if(!(allowed&(1U<<command))){s->emit("error","Mac does not permit the console session");return 0;}
+    unsigned command=s->highPerformanceRequested?2:(!hasUser&&!(allowed&2)?0:1);
+    if(!(allowed&(1U<<command))){s->emit("error","Mac does not permit the requested session");return 0;}
     uint8_t request[74]{};request[1]=72;request[3]=1;request[8]=command;
     if(info.size()>10){size_t n=std::min<size_t>(63,info.size()-10);memcpy(request+10,info.data()+10,n);}
     if(!WriteToRFBServer(c,reinterpret_cast<char*>(request),sizeof(request)))return 0;
@@ -48,6 +49,7 @@ extern "C" int ivncAppleSetupBefore(rfbClient* c){
     viewer[13]=6;viewer[17]=1;viewer[25]=15;
     viewer[34]=0xb0;viewer[36]=0x0c;viewer[37]=3;viewer[38]=0x90;viewer[44]=0x40;
     const uint8_t mode[]={10,0,0,1},display[]={13,1,0,0,0,0,0,0};
+    if(!requestHighPerformanceDisplay(s))return 0;
     return WriteToRFBServer(c,reinterpret_cast<char*>(viewer),sizeof(viewer))&&
         WriteToRFBServer(c,reinterpret_cast<const char*>(mode),sizeof(mode))&&
         WriteToRFBServer(c,reinterpret_cast<const char*>(display),sizeof(display));
@@ -56,6 +58,7 @@ extern "C" int ivncAppleEncodings(rfbClient* c,uint32_t* encodings,int count,int
     if(!owner(c)->appleProtocol)return count;auto* client=c; // Upstream byte-swap macro references this name.
     const unsigned metadata[]={1100,1101,1103,1105};
     for(unsigned encoding:metadata)if(count<maximum)encodings[count++]=rfbClientSwap32IfLE(encoding);
+    if(owner(c)->highPerformanceRequested){if(count+2>maximum)return count;memmove(encodings+1,encodings,count*sizeof(uint32_t));encodings[0]=rfbClientSwap32IfLE(1010);count++;encodings[count++]=rfbClientSwap32IfLE(1110);}
     return count;
 }
 bool appleAutoUpdate(NativeSession* s){

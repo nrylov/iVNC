@@ -13,7 +13,9 @@ struct NativeSession {
     JNIEnv* env=nullptr;
     jobject events=nullptr;
     jclass crypto=nullptr,tunnelClass=nullptr;
-    jobject tunnel=nullptr;
+    jobject tunnel=nullptr,media=nullptr;
+    jclass mediaClass=nullptr;
+    bool highPerformanceRequested=false;
     std::atomic<bool> encryptionRequested{false};
     bool encryptionPending=false,encryptionActive=false;
     bool enhancedRequested=false,appleProtocol=false,pushUpdates=false,awaitingGeometry=false,geometryChanged=false;
@@ -66,3 +68,10 @@ bool refreshDesktop(NativeSession* session,bool retry);
 bool requestAppleClipboard(NativeSession* session);
 bool sendAppleClipboard(NativeSession* session,int action,const std::vector<uint8_t>& payload);
 int receiveAppleClipboard(NativeSession* session);
+
+/** Direct HP metadata/UDP/decoder lifetime; offers leave TCP only inside encryption. */
+bool startHighPerformance(NativeSession*,jobject surface);
+void closeHighPerformance(NativeSession*);
+int highPerformanceRectangle(NativeSession*,unsigned encoding);
+bool pollHighPerformance(NativeSession*);
+bool requestHighPerformanceDisplay(NativeSession*);

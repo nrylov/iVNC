@@ -16,6 +16,9 @@ public final class ProfileStoreInstrumentation extends Instrumentation {
             String profile = new JSONObject().put("host", "test-server.invalid").put("port", 5900)
                 .put("username", "synthetic-user").put("password", "not-a-real-password-ABC123")
                 .put("mode", "highperf").toString();
+            ConnectionProfile hp=new ConnectionProfile("test-server.invalid",5900,"synthetic-user","synthetic-password",true,true,true,true);
+            JSONObject selected=new JSONObject(hp.encryptedInput());require(ConnectionProfile.parse(selected).highPerformance,"HP profile mode did not round-trip");
+            selected.remove("highPerformance");require(!ConnectionProfile.parse(selected).highPerformance,"Legacy profile must default to Standard");
             require(store.save(profile), "Could not encrypt profile");
             String saved = getTargetContext().getSharedPreferences("ivnc-profile-test", 0).getString("encrypted", "");
             require(!saved.contains("synthetic-user") && !saved.contains("not-a-real-password"), "Plaintext leaked to preferences");

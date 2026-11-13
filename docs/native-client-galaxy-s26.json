@@ -33,10 +33,10 @@
     "fourStandardWheelMasksAndReleasesPipelineOff": true
   },
   "realMacSession": "Owner verified accepted login and live 1920x1080 native framebuffer",
-  "highPerformance": "Not yet ported",
+  "highPerformance": "Native direct UDP/SRTP/HEVC implemented; owner confirms works well",
   "appleClipboard": "Implemented encrypted Apple text clipboard; synthetic native Galaxy tests pass; actual Mac verification pending",
   "release": "On hold by owner until native is evaluated",
-  "appVersion": "0.17-native-touch",
+  "appVersion": "0.18-native-high-performance",
   "realMacPublicKeyProbe": {
     "passed": true,
     "credentialsSent": false,
@@ -83,7 +83,7 @@
     "appOnlySyntheticVisualReview": "PASS",
     "realMacOwnerTest": "Owner confirms zoom/fullscreen works well, reports performance below hybrid and possibly earlier native"
   },
-  "nextOwnerPriority": "Verify native saved sessions/clipboard/initial image, then native High Performance",
+  "nextOwnerPriority": "Hold-to-repeat accessory arrows; iOS deferred",
   "uiRenderGuard": {
     "reason": "Pointer-only motion was reapplying identical TextureView transforms",
     "changes": "Reuse Matrix, skip unchanged transforms and cursor positions",
@@ -112,7 +112,7 @@
     "fragmentedZeroSizeGeometryStartup": "PASS",
     "realMacPublicKeyProbe": "PASS; no credentials sent",
     "realMacFullSession": "Owner confirms much smoother live session; log shows updates=push, mostly ~80\u2013140 Surface posts/sec and ~0.5\u20133ms socket wait/post. Not physical display FPS.",
-    "highPerformance": "Not implemented yet"
+    "highPerformance": "Implemented native HP in 0.18"
   },
   "nativeKeyboard": {
     "buttons": "Dedicated floating keyboard and separate options menu",
@@ -161,5 +161,18 @@
     "deviceUi": "PASS: actual MotionEvents, zoomed absolute targeting, direct drag/release, letterbox rejection, keyboard-visible controls without overlap",
     "actualMac": "Awaiting owner test",
     "syntheticVisualReview": "PASS: app-only viewer and keyboard PixelCopy captures, no owner content"
+  },
+  "nativeHighPerformance": {
+    "hostReferenceVectors": "PASS: exact offers/answers and SRTP/SRTCP tamper/replay/rollover, HEVC assembly",
+    "deviceFullPath": "PASS: encrypted virtual setup, real reordered/wrapped UDP, feedback and exact reference RGBA",
+    "activeInterruptionAndRestart": "PASS",
+    "standardClipboardAndRefresh": "PASS",
+    "profilesAndLifecycle": "PASS; HP encrypted profile flag and backward Standard default",
+    "realMac": "Owner confirms works well in 0.18",
+    "measuredLiveFps": "Not measured",
+    "audio": "Not implemented; receive/authenticate/discard",
+    "resolution": "1920x1080 virtual display, scale1",
+    "recovery": "Bounded re-offer on picture stall; full lifetime recreated on app return",
+    "browserRuntime": false
   }
 }

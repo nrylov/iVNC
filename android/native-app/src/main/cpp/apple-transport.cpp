@@ -54,6 +54,7 @@ extern "C" rfbBool ivncWriteStream(rfbClient* client,const char* bytes,unsigned 
 extern "C" int ivncContinueUpdates(rfbClient* client){auto* s=owner(client);return !s->encryptionPending&&!s->pushUpdates;}
 extern "C" int ivncAppleMetadata(rfbClient*,unsigned,int,int,int,int);
 extern "C" int ivncAppleRectangle(rfbClient* client,unsigned encoding,int x,int y,int width,int height){
+    auto* session=owner(client);int hp=highPerformanceRectangle(session,encoding);if(hp!=0)return hp;
     int metadata=ivncAppleMetadata(client,encoding,x,y,width,height);if(metadata!=0)return metadata;
     if(encoding!=1103)return 0;
     auto* s=owner(client);if(!s->encryptionRequested||s->encryptionActive||s->encryptionPending)return -1;

@@ -20,3 +20,13 @@ checkout of that branch when consulting the implementation for the upcoming nati
 High Performance port. Its `ard/` directory contains Apple protocol helpers;
 `android/app/src/main/cpp/` contains the existing HEVC decoder/compositor.
 Historical third-party sources retain their original licenses on that branch.
+
+## Native High Performance components
+
+0.18 restores the owned C++ HEVC decoder/compositor and ports the archived HP
+negotiation, plist/protobuf, SRTP, feedback and assembly algorithms into native-app
+Java/C++. Origin comments are retained. No browser application/runtime is restored.
+FFmpeg 9.0 is built as replaceable LGPL shared libraries with GPL/nonfree features
+disabled. Its unmodified source archive, LGPL notice, digest and build recipe live
+in `third_party/ffmpeg` and `scripts/build-video.sh`; the APK also includes the LGPL
+notice. See the archive for all original FFmpeg source notices.

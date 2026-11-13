@@ -22,7 +22,7 @@ final class NativeConnection implements AutoCloseable {
     private ConnectionProfile profile;
     NativeConnection(NativeRfb.Events events){this.events=events;}
     static boolean permanentFailure(String value){
-        return value.contains("authentication")||value.contains("denied")||value.contains("does not permit")||value.contains("does not offer enhanced");
+        return value.contains("authentication")||value.contains("denied")||value.contains("does not permit")||value.contains("does not offer enhanced")||(value.contains("High Performance")&&value.contains("select Standard"));
     }
     ConnectionProfile profile(){return profile;}
     void connect(ConnectionProfile profile){suspend();this.profile=profile;wanted=true;start();}
@@ -49,7 +49,7 @@ final class NativeConnection implements AutoCloseable {
                     });}
                     public void clipboard(byte[] bytes){main.post(()->{if(token==epoch&&foreground)events.clipboard(bytes);});}
                 });
-                handle=session;NativeRfb.pipeline(session,selected.pipeline);NativeRfb.enhanced(session,selected.enhanced);
+                handle=session;NativeRfb.pipeline(session,selected.pipeline);NativeRfb.enhanced(session,selected.enhanced);NativeRfb.highPerformance(session,selected.highPerformance);
             }
             try{NativeRfb.run(session,selected.host,selected.port,selected.username,selected.password,target);}
             finally{synchronized(lifetime){if(handle==session)handle=0;NativeRfb.destroy(session);}}

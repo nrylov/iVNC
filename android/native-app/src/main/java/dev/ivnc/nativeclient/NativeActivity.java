@@ -43,7 +43,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
     private NativeTrackpad trackpad;
     private boolean errorShown;
     private EditText host,port,user,password;
-    private android.widget.CheckBox compatibility;
+    private android.widget.CheckBox compatibility,highPerformance;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         synthetic=(getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0&&getIntent().getBooleanExtra("ivnc.synthetic",false);
@@ -102,9 +102,12 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         password.setSaveEnabled(false);
         password.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         compatibility=new android.widget.CheckBox(this);compatibility.setText("Compatibility mode");
+        highPerformance=new android.widget.CheckBox(this);highPerformance.setText("High Performance (virtual display)");
+        highPerformance.setOnCheckedChangeListener((button,enabled)->{if(enabled)compatibility.setChecked(false);});
+        compatibility.setOnCheckedChangeListener((button,enabled)->{if(enabled)highPerformance.setChecked(false);});
         remember=new android.widget.CheckBox(this);remember.setText("Remember connection securely");remember.setChecked(true);
         ConnectionProfile stored=saved.profile();
-        if(stored!=null){host.setText(stored.host);port.setText(String.valueOf(stored.port));user.setText(stored.username);compatibility.setChecked(!stored.enhanced);pipeline.setChecked(stored.pipeline);password.setHint("Saved password");}
+        if(stored!=null){host.setText(stored.host);port.setText(String.valueOf(stored.port));user.setText(stored.username);compatibility.setChecked(!stored.enhanced);pipeline.setChecked(stored.pipeline);highPerformance.setChecked(stored.highPerformance);password.setHint("Saved password");}
         if((!synthetic||getIntent().getBooleanExtra("ivnc.synthetic.autostart",false))&&stored!=null&&saved.autoResume()){profileSaved=true;connection.connect(stored);}
         else connectionDialog();
         if(saved.error()!=null){status.setText(saved.error());status.setVisibility(View.VISIBLE);}
@@ -131,6 +134,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         }
         if(compatibility.getParent()!=null)((android.view.ViewGroup)compatibility.getParent()).removeView(compatibility);
         fields.addView(compatibility);
+        if(highPerformance.getParent()!=null)((android.view.ViewGroup)highPerformance.getParent()).removeView(highPerformance);fields.addView(highPerformance);
         if(remember.getParent()!=null)((android.view.ViewGroup)remember.getParent()).removeView(remember);fields.addView(remember);
         TextView note=new TextView(this);note.setText(saved.error()!=null?saved.error():saved.profile()==null?"Login is encrypted on this device when remembered.":"Saved connection · password stored securely");fields.addView(note);
         if(saved.profile()!=null||saved.error()!=null){Button forget=new Button(this);forget.setText("Forget saved connection");forget.setTag("native-forget-connection");forget.setOnClickListener(view->{
@@ -139,7 +143,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         });fields.addView(forget);}
         android.widget.ScrollView content=new android.widget.ScrollView(this);content.addView(fields);
         connectionPanel=new AlertDialog.Builder(this).setTitle("Connect to your Mac").setView(content)
-            .setMessage("Standard mode · macOS Screen Sharing").setCancelable(true)
+            .setMessage("macOS Screen Sharing · choose Standard or High Performance").setCancelable(true)
             .setPositiveButton("Connect",(dialog,which)->connect()).setNeutralButton("Disconnect",(dialog,which)->stop())
             .setNegativeButton("Cancel",null).create();connectionPanel.show();
     }
@@ -153,7 +157,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
         if(address.isEmpty()||username.isEmpty()||secret.isEmpty()){status.setText("Enter the Mac address and login");return;}
         password.setText("");trackpad.cancel();clipboard.ready(false);connected=screenReady=false;haveFramebuffer=false;profileSaved=false;
         if(!remember.isChecked())saved.forget(ok->{});
-        connection.connect(new ConnectionProfile(address,selectedPort,username,secret,!compatibility.isChecked(),pipeline.isChecked(),remember.isChecked()));
+        connection.connect(new ConnectionProfile(address,selectedPort,username,secret,!compatibility.isChecked(),pipeline.isChecked(),remember.isChecked(),highPerformance.isChecked()));
     }
     private void event(String kind,String value){
         if(kind.equals("cursor")){
@@ -181,7 +185,7 @@ public final class NativeActivity extends Activity implements TextureView.Surfac
             screenReady=true;if(connected){cursor.setVisibility(View.VISIBLE);status.setVisibility(View.GONE);}
             if(!profileSaved&&connection.profile()!=null){profileSaved=true;ConnectionProfile profile=connection.profile();
                 if(profile.remember){saved.autoResume(true);saved.save(profile,ok->{if(!ok)android.widget.Toast.makeText(this,"Connection works, but saving failed",android.widget.Toast.LENGTH_LONG).show();else password.setHint("Saved password");});}}
-            status.setText("Native Standard · "+value+" Surface posts");
+            status.setText((connection.profile()!=null&&connection.profile().highPerformance?"High Performance":"Native Standard")+" · "+value+" Surface posts");
         }
         else status.setText(value);
     }
