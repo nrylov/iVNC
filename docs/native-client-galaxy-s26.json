@@ -35,7 +35,21 @@
   "realMacSession": "Owner verified accepted login and live 1920x1080 native framebuffer",
   "highPerformance": "Native direct UDP/SRTP/HEVC implemented; owner confirms works well",
   "appleClipboard": "Implemented encrypted Apple text clipboard; synthetic native Galaxy tests pass; actual Mac verification pending",
-  "release": "On hold by owner until native is evaluated",
+  "release": {
+    "version": "0.19.0",
+    "versionCode": 20,
+    "url": "https://github.com/nrylov/iVNC/releases/tag/v0.19.0",
+    "preview": true,
+    "published": true,
+    "sourceCommit": "8ae3cff245cea1ee0a202ccfb2776cf3722ae8eb",
+    "releaseBuild": "PASS including lintVitalRelease",
+    "signature": "PASS; same certificate as project installs",
+    "contents": "PASS: non-debuggable, no instrumentation/test/browser assets, ARM64 libraries and licenses",
+    "alignment": "PASS: 16KiB APK alignment",
+    "uploadedChecksums": "PASS: downloaded APK and complete source bundle match SHA256SUMS",
+    "sourceBundleRebuildPreparation": "PASS without Git metadata",
+    "installedOnOwnerPhone": false
+  },
   "appVersion": "0.19-native-arrow-repeat",
   "realMacPublicKeyProbe": {
     "passed": true,

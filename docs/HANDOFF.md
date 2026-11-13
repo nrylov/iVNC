@@ -1,3 +1,23 @@
+# Published GitHub preview v0.19.0 — 2026-11-12
+
+Release is public (not draft), marked prerelease:
+https://github.com/nrylov/iVNC/releases/tag/v0.19.0
+Tag points to 8ae3cff245cea1ee0a202ccfb2776cf3722ae8eb.
+
+Assets: iVNC-0.19.0-arm64-v8a.apk (4,181,099 bytes), complete corresponding source
+bundle (13,439,244 bytes), SHA256SUMS. Downloaded uploaded assets and verified both
+SHA-256 hashes against local originals. Signature/certificate, no-debug/no-test
+manifest/assets and 16KiB alignment checks pass. Source archive includes original
+and exact patched LibVNCClient, FFmpeg source archive, all component licenses and
+build recipes. Smoke test confirms source bundle prepares client without Git
+metadata. Source packaging supports this Mac's older Python tarfile API.
+
+No release install performed on owner's phone; prior0.19 development installation
+remains. Release versionName0.19.0/code20 can update it using the same project
+certificate. Signing key stays ignored under .dev; never upload it. iOS remains
+explicitly deferred. Current publication request complete; further work driven by
+owner feedback. No additional release hold applies to this authorized publication.
+
 # GitHub release v0.19.0 authorized — 2026-11-12
 
 Owner explicitly requests building an APK and publishing a GitHub release, lifting
