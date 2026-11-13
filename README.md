@@ -40,7 +40,14 @@ SDK, JDK, NDK and caches remain in ignored `.dev/`. The debug APK is
 ```
 
 See [native architecture](docs/NATIVE-CLIENT.md), [saved connections](docs/SAVED-CONNECTIONS.md)
-and [current handoff](docs/HANDOFF.md). APK releases remain on hold during validation.
+and [current handoff](docs/HANDOFF.md). Installable APKs are available on the
+[GitHub releases page](https://github.com/nrylov/iVNC/releases).
+
+For a signed release build, run `./scripts/build-release.sh`. It uses the existing
+project-local signing key so it can update development installs; keep that private
+key safe for future updates. Release builds exclude instrumentation and test assets. After committing the release
+source, `python3 scripts/package-release.py` packages the APK, complete native
+dependency sources and checksums under `.dev/releases/`.
 
 ## Licensing and provenance
 

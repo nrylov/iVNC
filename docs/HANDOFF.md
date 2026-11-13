@@ -1,3 +1,27 @@
+# GitHub release v0.19.0 authorized — 2026-11-12
+
+Owner explicitly requests building an APK and publishing a GitHub release, lifting
+the previous release hold. Version is 0.19.0, Android code20. Release variant is
+non-debuggable, has no synthetic/debug instrumentation/assets and uses the existing
+project-local certificate (.dev/debug.keystore, never publish/copy the key) so it
+updates existing code19 installs while preserving saved credentials. Build command:
+scripts/build-release.sh. Same app functionality as owner-tested native HP plus
+validated held arrows. No iOS build.
+
+Release build PASS including lintVitalRelease. apksigner verification PASS;
+certificate matches previous project APK. Manifest debug=false/no instrumentation,
+ARM64-only five native libraries, required component license assets, no browser or
+test media assets, 16KiB APK zip alignment PASS. APK about4MB, Android12/API31+.
+No phone install performed for this release-only packaging request.
+
+Packaging: scripts/package-release.py archives tracked source, pinned LibVNCClient
+plus exact prepared/patched sources, FFmpeg source archive, notices and build scripts.
+No .dev tools, owner data or signing key included. Assets APK/source.tar.gz/SHA256SUMS
+under ignored .dev/releases/v0.19.0. Release notes docs/RELEASE-v0.19.0.md.
+Next: commit/push release source, package/check bundle, publish v0.19.0 GitHub preview
+with assets, verify uploaded hashes/links, and record final URL. Owner publication
+authorization is already explicit; no further permission needed.
+
 # Native 0.19 held accessory arrows — 2026-11-12
 
 Owner confirms native HP works well, then requests repeating arrow buttons.

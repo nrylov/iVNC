@@ -46,4 +46,4 @@ The earlier implementation remains on the reference branch linked in
 in `third_party/ffmpeg`; protocol ports retain their archived origin comments.
 
 Next: validate live Mac HP, tune measured bottlenecks, then consider audio/dynamic
-resolution. iOS is explicitly deferred by owner. APK release remains on hold.
+resolution. iOS is explicitly deferred by owner. Owner authorized a GitHub APK release on 2026-11-12; see the releases page.
